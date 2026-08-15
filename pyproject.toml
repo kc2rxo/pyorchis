@@ -33,6 +33,6 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/kc2rxo/pyorchis.git"
-Issues = "https://github.com/kc2rxo/pyorchis/issues"
-Changelog = "https://github.com/kc2rxo/pyorchis/blob/master/CHANGELOG.md"
+Repository = "https://github.com/kc2rxo/orchis.git"
+Issues = "https://github.com/kc2rxo/orchis/issues"
+Changelog = "https://github.com/kc2rxo/orchis/blob/master/CHANGELOG.md"
