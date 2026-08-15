@@ -24,9 +24,9 @@ using of ORCHIDs as part of modern applications and protocols.
 
 ## Package Features
 
-This package supports a majority of cryptographic keys that are shared between the HIT Suite ID (RFC7401) and 
-HHIT Suite ID (RFC9374) families. The missing key algorithm is DSA and is excluded in favor of ECDSA. ECDSA_LOW is 
-also not supported due to the underlying library missing its curve (SECP160R1).
+This package supports a majority of cryptographic key algorithms that are shared between the HIT Suite ID (RFC7401) and 
+HHIT Suite ID (RFC9374) families. DSA and is excluded in favor of ECDSA. ECDSA_LOW is not supported due to 
+the underlying library missing its curve (SECP160R1).
 
 | Key Algorithm       | Key Sizes or Curves    | Underlying Package |
 |---------------------|------------------------|--------------------|
@@ -43,6 +43,7 @@ The following structures can be obtained through the ORCHID package APIs:
 |-----------------------------------|--------------------|--------------------|----------------------|
 | COSE_Key                          | `Orchid`           | `cwt`              | RFC9052, Section 7   |
 | JWK                               | `Orchid`           | `jwcrypto`         | RFC7517              |
+| IPv6 Address                      | `Orchid`           | -                  | -                    |
 | COSE_Sign1                        | `ObjectSigning`    | `cwt`              | RFC9052, Section 4   |
 | COSE_Sign                         | `ObjectSigning`    | `cwt`              | RFC9052, Section 4   |
 | JWS                               | `ObjectSigning`    | `jwcrypto`         | RFC7515              |
