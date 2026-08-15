@@ -1,6 +1,5 @@
 from enum import Enum, IntEnum
 from ipaddress import IPv6Address
-from typing import Self
 
 
 class ContextId(Enum):
@@ -18,7 +17,8 @@ class Prefix(Enum):
             return cls.HIT
         elif ip.packed.hex().startswith(cls.DET.value.hex()[:-1]):
             return cls.DET
-        else: raise ValueError("unknown IPv6 prefix")
+        else:
+            raise ValueError("unknown IPv6 prefix")
 
 
 class SuiteId(IntEnum):

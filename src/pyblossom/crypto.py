@@ -12,7 +12,6 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key, l
 
 from src.pyblossom.constant import ContextId, Prefix, SuiteId
 
-
 OrchidPublicKeyAlgorithms = Ed448PublicKey | Ed25519PublicKey | RSAPublicKey | EllipticCurvePublicKey
 OrchidPrivateKeyAlgorithms = Ed448PrivateKey | Ed25519PrivateKey | RSAPrivateKey | EllipticCurvePrivateKey
 OrchidDsaRsaKeySizes = Literal[2048, 4096, 8192]
@@ -32,18 +31,20 @@ def suite_id_by_public_key_alg(public: OrchidPublicKeyAlgorithms) -> SuiteId:
 
 
 def generate_key_pair(
-    oga_id: SuiteId,
-    rsa_key_size: OrchidDsaRsaKeySizes = 2048,
-    ecdsa_curve: OrchidEcdsaCurves = 'P-256',
-    eddsa_curve: OrchidEddsaCurves = 'Ed25519'
+        oga_id: SuiteId,
+        rsa_key_size: OrchidDsaRsaKeySizes = 2048,
+        ecdsa_curve: OrchidEcdsaCurves = 'P-256',
+        eddsa_curve: OrchidEddsaCurves = 'Ed25519'
 ) -> tuple[OrchidPublicKeyAlgorithms, OrchidPrivateKeyAlgorithms]:
     match oga_id:
         case SuiteId.RSA_DSA_SHA256:
             _rsa = rsa.generate_private_key(65537, rsa_key_size)
             _public, _private = _rsa.public_key(), _rsa
         case SuiteId.ECDSA_SHA384:
-            if ecdsa_curve == 'P-256': _ecdsa = ec.generate_private_key(ec.SECP256R1())
-            else: _ecdsa = ec.generate_private_key(ec.SECP384R1())
+            if ecdsa_curve == 'P-256':
+                _ecdsa = ec.generate_private_key(ec.SECP256R1())
+            else:
+                _ecdsa = ec.generate_private_key(ec.SECP384R1())
             _public, _private = _ecdsa.public_key(), _ecdsa
         case SuiteId.EDDSA_CSHAKE128:
             _eddsa = Ed25519PrivateKey.generate() if eddsa_curve == 25519 else Ed448PrivateKey.generate()
@@ -54,8 +55,8 @@ def generate_key_pair(
 
 
 def load_pem_key(
-    pem_data: bytes,
-    password: bytes | None = None
+        pem_data: bytes,
+        password: bytes | None = None
 ) -> tuple[OrchidPublicKeyAlgorithms, OrchidPrivateKeyAlgorithms]:
     if password:
         _private = load_pem_private_key(pem_data, password)
@@ -106,10 +107,10 @@ def construct_host_identity(public: OrchidPublicKeyAlgorithms) -> bytes:
 
 
 def construct_ip(
-    public: OrchidPublicKeyAlgorithms,
-    prefix: Prefix,
-    info: bytes | None = None,
-    ctx_id: ContextId = ContextId.RFC7401
+        public: OrchidPublicKeyAlgorithms,
+        prefix: Prefix,
+        info: bytes | None = None,
+        ctx_id: ContextId = ContextId.RFC7401
 ) -> IPv6Address:
     _suite_id = suite_id_by_public_key_alg(public)
     _prefix_info_oga = _construct_prefix_info_oga(prefix, SuiteId.RSA_DSA_SHA256, info)

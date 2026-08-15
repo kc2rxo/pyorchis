@@ -30,25 +30,28 @@ class ObjectSigning:
         try:
             _kid = IPv6Address(kid) if not isinstance(kid, IPv6Address) else kid
             if _kid in self._signers: self._signers.pop(_kid)
-        except ValueError: raise ValueError("kid is not IPv6Address")
+        except ValueError:
+            raise ValueError("kid is not IPv6Address")
 
     def remove_signers(self, kids: list[str | bytes | IPv6Address]) -> None:
         for kid in kids: self.remove_signer(kid)
 
     def get_signer(
-        self,
-        kid: IPv6Address,
-        json: bool = False,
-        alg: OrchidRsaAlgorithms = 'PS256'
+            self,
+            kid: IPv6Address,
+            json: bool = False,
+            alg: OrchidRsaAlgorithms = 'PS256'
     ) -> JWK | COSEKeyInterface:
-        if json: return self._signers[kid].jwk(True, alg)
-        else: return self._signers[kid].cose_key(True, alg)
+        if json:
+            return self._signers[kid].jwk(True, alg)
+        else:
+            return self._signers[kid].cose_key(True, alg)
 
     def sign(
-        self,
-        payload: bytes,
-        signers: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms],
-        json: bool = False
+            self,
+            payload: bytes,
+            signers: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms],
+            json: bool = False
     ) -> JWS | COSEMessage:
         _signers = self._prepare_signers(signers, json)
         if len(_signers) == 0: raise ValueError("no valid signers")
@@ -58,28 +61,32 @@ class ObjectSigning:
             return _jws
         else:
             _cose = COSE.new(True, True)
-            if len(_signers) == 1: _msg = _cose.encode_and_sign(payload, _signers[0])
-            else: _msg = _cose.encode_and_sign(payload, signers=_signers)
+            if len(_signers) == 1:
+                _msg = _cose.encode_and_sign(payload, _signers[0])
+            else:
+                _msg = _cose.encode_and_sign(payload, signers=_signers)
             return COSEMessage.loads(_msg)
 
     def countersign(
-        self,
-        msg: COSEMessage,
-        signers: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms]
+            self,
+            msg: COSEMessage,
+            signers: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms]
     ) -> COSEMessage:
         _msg = deepcopy(msg)
         for signer in self._prepare_signers(signers): _msg.countersign(signer)
         return _msg
 
     def verify(
-        self,
-        token: str | bytes,
-        keys: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms]
+            self,
+            token: str | bytes,
+            keys: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms]
     ) -> tuple[bool, JWS | COSEMessage | None]:
         _keys = self._prepare_signers(keys) if isinstance(token, bytes) else self._prepare_signers(keys, True)
         if isinstance(token, bytes):
-            try: _msg = COSEMessage.loads(token)
-            except ValueError | DecodeError | VerifyError: return False, None
+            try:
+                _msg = COSEMessage.loads(token)
+            except ValueError | DecodeError | VerifyError:
+                return False, None
             try:
                 _ = COSE.new().decode(token, _keys)
                 return True, _msg
@@ -89,16 +96,19 @@ class ObjectSigning:
             return False, None  # todo: support
 
     def _prepare_signers(
-        self,
-        signers: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms],
-        json: bool = False
+            self,
+            signers: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms],
+            json: bool = False
     ) -> list[JWK] | list[COSEKeyInterface]:
         _signers = []
         for _kid, _alg in signers.items():
             if isinstance(_kid, str) or isinstance(_kid, bytes):
-                try: __kid = IPv6Address(_kid)
-                except ValueError: continue
-            else: __kid = _kid
+                try:
+                    __kid = IPv6Address(_kid)
+                except ValueError:
+                    continue
+            else:
+                __kid = _kid
             if __kid not in self._signers: continue
             if not self._signers[__kid].has_private: continue
             if _alg not in get_args(OrchidRsaAlgorithms): continue

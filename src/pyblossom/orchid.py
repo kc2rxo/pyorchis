@@ -53,18 +53,18 @@ class Orchid:
         return suite_id_by_public_key_alg(self.public_key)
 
     def cose_key(
-        self,
-        private_key: bool = False,
-        rsa_alg: OrchidRsaAlgorithms = 'PS256',
+            self,
+            private_key: bool = False,
+            rsa_alg: OrchidRsaAlgorithms = 'PS256',
     ) -> COSEKeyInterface:
         _cose_key = COSEKey.from_jwk(self.jwk(private_key, rsa_alg)).to_dict()
         _cose_key[2] = self.ip.packed  # set as bytes instead of bytes(str); todo: #6.54?
         return COSEKey.new(_cose_key)
 
     def jwk(
-        self,
-        private_key: bool = False,
-        rsa_alg: OrchidRsaAlgorithms = 'PS256',
+            self,
+            private_key: bool = False,
+            rsa_alg: OrchidRsaAlgorithms = 'PS256',
     ) -> JWK:
         _jwk = JWK.from_pyca(self.d) if private_key and self.d else JWK.from_pyca(self.x)
         _jwk['kid'] = self.ip.compressed  # todo: exploded?
@@ -83,11 +83,11 @@ class Orchid:
 
     @classmethod
     def host_identity_tag(
-        cls,
-        oga_id: SuiteId,
-        rsa_key_size: OrchidDsaRsaKeySizes = 2048,
-        ecdsa_curve: OrchidEcdsaCurves = 'P-256',
-        eddsa_curve: OrchidEddsaCurves = 'Ed25519',
+            cls,
+            oga_id: SuiteId,
+            rsa_key_size: OrchidDsaRsaKeySizes = 2048,
+            ecdsa_curve: OrchidEcdsaCurves = 'P-256',
+            eddsa_curve: OrchidEddsaCurves = 'Ed25519',
     ) -> Self:
         _orchid = cls()
         _orchid.x, _orchid.d = generate_key_pair(oga_id, rsa_key_size, ecdsa_curve, eddsa_curve)
@@ -96,13 +96,13 @@ class Orchid:
 
     @classmethod
     def drip_entity_tag(
-        cls,
-        raa: int,
-        hda: int,
-        oga_id: SuiteId,
-        rsa_key_size: OrchidDsaRsaKeySizes = 2048,
-        ecdsa_curve: OrchidEcdsaCurves = 'P-256',
-        eddsa_curve: OrchidEddsaCurves = 'Ed25519'
+            cls,
+            raa: int,
+            hda: int,
+            oga_id: SuiteId,
+            rsa_key_size: OrchidDsaRsaKeySizes = 2048,
+            ecdsa_curve: OrchidEcdsaCurves = 'P-256',
+            eddsa_curve: OrchidEddsaCurves = 'Ed25519'
     ) -> Self:
         _orchid = cls()
         _orchid.x, _orchid.d = generate_key_pair(oga_id, rsa_key_size, ecdsa_curve, eddsa_curve)
@@ -111,9 +111,9 @@ class Orchid:
 
     @classmethod
     def import_jwk(
-        cls, jwk: str,
-        prefix: Prefix = Prefix.HIT,
-        info: bytes | None = None,
+            cls, jwk: str,
+            prefix: Prefix = Prefix.HIT,
+            info: bytes | None = None,
     ) -> Self:
         _jwk = JWK.from_json(jwk)
         _password: bytes | None = token_bytes(randbelow(100)) if _jwk.has_private else None
@@ -127,11 +127,11 @@ class Orchid:
 
     @classmethod
     def import_pem(cls,
-        pem_data: bytes,
-        password: bytes | None = None,
-        kid: str = '',
-        prefix: Prefix = Prefix.HIT,
-        info: bytes | None = None,
+           pem_data: bytes,
+           password: bytes | None = None,
+           kid: str = '',
+           prefix: Prefix = Prefix.HIT,
+           info: bytes | None = None,
     ) -> Self:
         _orchid = cls()
         _orchid.x, _orchid.d = load_pem_key(pem_data, password)

@@ -1,5 +1,2 @@
-
-
-
 class Drip:
     pass

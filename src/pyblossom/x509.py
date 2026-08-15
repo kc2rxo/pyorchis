@@ -9,10 +9,10 @@ from pyblossom.orchid import Orchid
 
 
 def csr(
-    subject: Orchid,
-    subject_name: Name,
-    orchid_san: bool = False,
-    serialize: Encoding | None = None
+        subject: Orchid,
+        subject_name: Name,
+        orchid_san: bool = False,
+        serialize: Encoding | None = None
 ) -> CertificateSigningRequest | bytes:
     if not subject.has_private: raise ValueError('Private key not provided')
     _csr = CertificateSigningRequestBuilder()
@@ -23,15 +23,15 @@ def csr(
 
 
 def certificate(
-    signer: Orchid,
-    subject: Orchid,
-    vnb: datetime,
-    vna: datetime,
-    serial: int,
-    uri: str | None = None,
-    signer_ca: bool = False,
-    subject_name: Name | None = None,
-    serialize: Encoding | None = None
+        signer: Orchid,
+        subject: Orchid,
+        vnb: datetime,
+        vna: datetime,
+        serial: int,
+        uri: str | None = None,
+        signer_ca: bool = False,
+        subject_name: Name | None = None,
+        serialize: Encoding | None = None
 ) -> Certificate | bytes:
     if not signer.has_private: raise ValueError('Private key not provided')
     _cert = CertificateBuilder()
@@ -39,8 +39,10 @@ def certificate(
     _cert = _cert.not_valid_after(vnb)
     _cert = _cert.serial_number(serial)
     _cert = _cert.public_key(subject.public_key)
-    if subject_name: _cert = _cert.subject_name(subject_name)
-    else: _cert = _cert.subject_name(Name([]))
+    if subject_name:
+        _cert = _cert.subject_name(subject_name)
+    else:
+        _cert = _cert.subject_name(Name([]))
     san: list[GeneralName] = [IPAddress(subject.ip)]
     if uri: san.append(UniformResourceIdentifier(uri))
     _cert = _cert.add_extension(SubjectAlternativeName(san), critical=True)
@@ -55,10 +57,14 @@ def certificate(
 
 
 def load_pem_x509(pem_data: bytes) -> CertificateSigningRequest | Certificate:
-    try: return load_pem_x509_certificate(pem_data)
-    except: return load_pem_x509_csr(pem_data)
+    try:
+        return load_pem_x509_certificate(pem_data)
+    except ValueError:
+        return load_pem_x509_csr(pem_data)
 
 
 def load_der_x509(der_data: bytes) -> CertificateSigningRequest | Certificate:
-    try: return load_der_x509_certificate(der_data)
-    except: return load_der_x509_csr(der_data)
+    try:
+        return load_der_x509_certificate(der_data)
+    except ValueError:
+        return load_der_x509_csr(der_data)
