@@ -4,17 +4,35 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyblossom"
-version = "0.1.0"
-description = "Overlay Routable Cryptographic Hash IDentifier library for modern applications & protocols."
-readme = "README.md"
+version = "2026.8.0a.0"
+description = "General-Use ORCHIDs for Modern Applications & Protocols."
 requires-python = ">=3.13"
-license = { text = "MIT" }
-authors = [
-    { name = "Adam Wiethuechter", email = "atw.ietf@gmail.com" }
-]
 dependencies = [
     "cryptography>=50.0.0",
     "pycryptodome>3.23.0",
     "jwcrypto>=1.5.8",
     "cwt>=3.3.0",
 ]
+authors = [
+    { name = "Adam Wiethuechter", email = "adam.wiethuechter@gmail.com" }
+]
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["COPYING.txt"]
+keywords = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications", "Topic :: Internet",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Networking"
+]
+
+[project.urls]
+Repository = "https://github.com/kc2rxo/pyblossom.git"
+Issues = "https://github.com/kc2rxo/pyblossom/issues"
+Changelog = "https://github.com/kc2rxo/pyblossom/blob/master/CHANGELOG.md"
