@@ -12,6 +12,14 @@ from pyblossom.orchid import Orchid
 
 
 class ObjectSigning:
+    """Container for COSE/JOSE signature structure generation & verification.
+
+    Internally uses a dict of Orchid instances, indexed by ORCHID IPv6 addresses.
+    Orchids can be added or removed using their respective ORCHID IPv6 address (Key ID).
+    Allows selection of subset of internally stored Orchid instances to use for signing operations.
+
+    WARNING: this class and its functions have not been tested. Beware of dragons!
+    """
     def __init__(self):
         self._signers: dict[IPv6Address, Orchid] = {}
 
@@ -42,6 +50,17 @@ class ObjectSigning:
             json: bool = False,
             alg: OrchidRsaAlgorithms = 'PS256'
     ) -> JWK | COSEKeyInterface:
+        """
+        Provides an Orchid instance from the internal store as COSE Key or JWK.
+
+        Args:
+            kid: ORCHID IPv6 address to select
+            json: flag for JWK or COSE Key, default=COSE Key (False)
+            alg: selection for RSA algorithm, default=PS256
+
+        Returns:
+            Instance of JWK or COSE Key
+        """
         if json:
             return self._signers[kid].jwk(True, alg)
         else:
@@ -53,6 +72,17 @@ class ObjectSigning:
             signers: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms],
             json: bool = False
     ) -> JWS | COSEMessage:
+        """
+        Creates a JWS or COSE Message instance that is signed by selected Orchids.
+
+        Args:
+            payload: data bytes to be signed
+            signers: map of internal Orchids (using Key ID) from store and the RSA algorithm to use
+            json: flag for JSON Web Signature or COSE Sign/Sign1
+
+        Returns:
+            Instance of JWS or COSE Message with Sign/Sign1
+        """
         _signers = self._prepare_signers(signers, json)
         if len(_signers) == 0: raise ValueError("no valid signers")
         if json:
@@ -72,6 +102,15 @@ class ObjectSigning:
             msg: COSEMessage,
             signers: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms]
     ) -> COSEMessage:
+        """
+
+        Args:
+            msg: COSE Message to countersign
+            signers: map of internal Orchids (using Key ID) from store and the RSA algorithm to use
+
+        Returns:
+            copy of COSE Message countersigned
+        """
         _msg = deepcopy(msg)
         for signer in self._prepare_signers(signers): _msg.countersign(signer)
         return _msg
@@ -81,6 +120,16 @@ class ObjectSigning:
             token: str | bytes,
             keys: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms]
     ) -> tuple[bool, JWS | COSEMessage | None]:
+        """
+        WARNING: not tested, probably very very very very wrong and broken.
+
+        Args:
+            token:
+            keys:
+
+        Returns:
+
+        """
         _keys = self._prepare_signers(keys) if isinstance(token, bytes) else self._prepare_signers(keys, True)
         if isinstance(token, bytes):
             try:
