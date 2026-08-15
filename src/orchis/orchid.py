@@ -7,14 +7,14 @@ from cwt import COSEKey
 from cwt.cose_key_interface import COSEKeyInterface
 from jwcrypto.jwk import JWK
 
-from src.pyblossom.constant import SuiteId, ContextId, Prefix
-from src.pyblossom.crypto import (
-    OrchidPrivateKeyAlgorithms,
-    OrchidPublicKeyAlgorithms,
-    OrchidDsaRsaKeySizes,
-    OrchidRsaAlgorithms,
-    OrchidEcdsaCurves,
-    OrchidEddsaCurves,
+from src.orchis.constant import SuiteId, ContextId, Prefix
+from src.orchis.crypto import (
+    OrchisPrivateKeyAlgorithms,
+    OrchisPublicKeyAlgorithms,
+    OrchisRsaKeySizes,
+    OrchisRsaAlgorithms,
+    OrchisEcdsaCurves,
+    OrchisEddsaCurves,
     generate_key_pair,
     construct_host_identity,
     suite_id_from_public_key_alg,
@@ -35,12 +35,12 @@ class Orchid:
         d: An optional private key
         ip: An IPv6 address instance loaded with an ORCHID
     """
-    x: OrchidPublicKeyAlgorithms
-    d: OrchidPrivateKeyAlgorithms | None
+    x: OrchisPublicKeyAlgorithms
+    d: OrchisPrivateKeyAlgorithms | None
     ip: IPv6Address
 
     @property
-    def public_key(self) -> OrchidPublicKeyAlgorithms:
+    def public_key(self) -> OrchisPublicKeyAlgorithms:
         return self.x
 
     @property
@@ -48,7 +48,7 @@ class Orchid:
         return self.d is not None
 
     @property
-    def private_key(self) -> OrchidPrivateKeyAlgorithms | None:
+    def private_key(self) -> OrchisPrivateKeyAlgorithms | None:
         return self.d
 
     @property
@@ -74,7 +74,7 @@ class Orchid:
     def cose_key(
             self,
             private_key: bool = False,
-            rsa_alg: OrchidRsaAlgorithms = 'PS256',
+            rsa_alg: OrchisRsaAlgorithms = 'PS256',
     ) -> COSEKeyInterface:
         """
         Generates a COSE Key for use with COSE applications, specifically the cwt package.
@@ -94,7 +94,7 @@ class Orchid:
     def jwk(
             self,
             private_key: bool = False,
-            rsa_alg: OrchidRsaAlgorithms = 'PS256',
+            rsa_alg: OrchisRsaAlgorithms = 'PS256',
     ) -> JWK:
         """
         Generates a JSON Web Key for use with JOSE applications, specifically the jwcrypto package.
@@ -131,9 +131,9 @@ class Orchid:
     def host_identity_tag(
             cls,
             hit_suite_id: SuiteId,
-            rsa_key_size: OrchidDsaRsaKeySizes = 2048,
-            ecdsa_curve: OrchidEcdsaCurves = 'P-256',
-            eddsa_curve: OrchidEddsaCurves = 'Ed25519',
+            rsa_key_size: OrchisRsaKeySizes = 2048,
+            ecdsa_curve: OrchisEcdsaCurves = 'P-256',
+            eddsa_curve: OrchisEddsaCurves = 'Ed25519',
     ) -> Self:
         """
         Generates a Host Identity Tag (HIT) per RFC7401.
@@ -158,9 +158,9 @@ class Orchid:
             raa: int,
             hda: int,
             hhit_suite_id: SuiteId,
-            rsa_key_size: OrchidDsaRsaKeySizes = 2048,
-            ecdsa_curve: OrchidEcdsaCurves = 'P-256',
-            eddsa_curve: OrchidEddsaCurves = 'Ed25519'
+            rsa_key_size: OrchisRsaKeySizes = 2048,
+            ecdsa_curve: OrchisEcdsaCurves = 'P-256',
+            eddsa_curve: OrchisEddsaCurves = 'Ed25519'
     ) -> Self:
         """
         Generates a DRIP Entity Tag (DRIP) per RFC9374.

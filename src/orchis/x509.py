@@ -19,7 +19,7 @@ from cryptography.x509 import (
     BasicConstraints
 )
 
-from pyblossom.orchid import Orchid
+from orchis.orchid import Orchid
 
 
 def csr(

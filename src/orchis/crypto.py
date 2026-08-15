@@ -10,18 +10,18 @@ from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey, Ed44
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 
-from src.pyblossom.constant import ContextId, Prefix, SuiteId
+from src.orchis.constant import ContextId, Prefix, SuiteId
 
 
-OrchidPublicKeyAlgorithms = Ed448PublicKey | Ed25519PublicKey | RSAPublicKey | EllipticCurvePublicKey
-OrchidPrivateKeyAlgorithms = Ed448PrivateKey | Ed25519PrivateKey | RSAPrivateKey | EllipticCurvePrivateKey
-OrchidDsaRsaKeySizes = Literal[2048, 4096, 8192]
-OrchidRsaAlgorithms = Literal['PS256', 'PS384', 'PS512']
-OrchidEcdsaCurves = Literal['P-256', 'P-384']
-OrchidEddsaCurves = Literal['Ed448', 'Ed25519']
+OrchisPublicKeyAlgorithms = Ed448PublicKey | Ed25519PublicKey | RSAPublicKey | EllipticCurvePublicKey
+OrchisPrivateKeyAlgorithms = Ed448PrivateKey | Ed25519PrivateKey | RSAPrivateKey | EllipticCurvePrivateKey
+OrchisRsaKeySizes = Literal[2048, 4096, 8192]
+OrchisRsaAlgorithms = Literal['PS256', 'PS384', 'PS512']
+OrchisEcdsaCurves = Literal['P-256', 'P-384']
+OrchisEddsaCurves = Literal['Ed448', 'Ed25519']
 
 
-def suite_id_from_public_key_alg(public: OrchidPublicKeyAlgorithms) -> SuiteId:
+def suite_id_from_public_key_alg(public: OrchisPublicKeyAlgorithms) -> SuiteId:
     """
     Selects a SuiteID from public key algorithm
 
@@ -42,10 +42,10 @@ def suite_id_from_public_key_alg(public: OrchidPublicKeyAlgorithms) -> SuiteId:
 
 def generate_key_pair(
         oga_id: SuiteId,
-        rsa_key_size: OrchidDsaRsaKeySizes = 2048,
-        ecdsa_curve: OrchidEcdsaCurves = 'P-256',
-        eddsa_curve: OrchidEddsaCurves = 'Ed25519'
-) -> tuple[OrchidPublicKeyAlgorithms, OrchidPrivateKeyAlgorithms]:
+        rsa_key_size: OrchisRsaKeySizes = 2048,
+        ecdsa_curve: OrchisEcdsaCurves = 'P-256',
+        eddsa_curve: OrchisEddsaCurves = 'Ed25519'
+) -> tuple[OrchisPublicKeyAlgorithms, OrchisPrivateKeyAlgorithms]:
     """
     Generates new instances of public and private keys for a given Orchid Generation Algorithm ID (OGA ID).
 
@@ -79,7 +79,7 @@ def generate_key_pair(
 def load_pem_key(
         pem_data: bytes,
         password: bytes | None = None
-) -> tuple[OrchidPublicKeyAlgorithms, OrchidPrivateKeyAlgorithms]:
+) -> tuple[OrchisPublicKeyAlgorithms, OrchisPrivateKeyAlgorithms]:
     """
     Loads PEM data to instances of public and private keys.
 
@@ -95,7 +95,7 @@ def load_pem_key(
         _public = _private.public_key()
     else:
         _public, _private = load_pem_public_key(pem_data, None), None
-    _public: OrchidPublicKeyAlgorithms
+    _public: OrchisPublicKeyAlgorithms
     match suite_id_from_public_key_alg(_public):
         case SuiteId.RSA_DSA_SHA256:
             _public: RSAPublicKey
@@ -113,7 +113,7 @@ def load_pem_key(
             raise TypeError('key algorithm not supported')
 
 
-def construct_host_identity(public: OrchidPublicKeyAlgorithms) -> bytes:
+def construct_host_identity(public: OrchisPublicKeyAlgorithms) -> bytes:
     """
     Host Identity field of HOST_ID parameter from RFC7401.
 
@@ -148,7 +148,7 @@ def construct_host_identity(public: OrchidPublicKeyAlgorithms) -> bytes:
 
 
 def construct_ip(
-        public: OrchidPublicKeyAlgorithms,
+        public: OrchisPublicKeyAlgorithms,
         prefix: Prefix,
         info: bytes | None = None,
         ctx_id: ContextId = ContextId.RFC7401
