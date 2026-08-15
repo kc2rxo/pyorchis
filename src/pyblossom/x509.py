@@ -9,18 +9,18 @@ from pyblossom.orchid import Orchid
 
 
 def csr(
-    orchid: Orchid,
-    subject: Name,
+    subject: Orchid,
+    subject_name: Name,
     orchid_san: bool = False,
     serialize: Encoding | None = None
 ) -> CertificateSigningRequest | bytes:
-    if not orchid.has_private: raise ValueError('Private key not provided')
+    if not subject.has_private: raise ValueError('Private key not provided')
     _csr = CertificateSigningRequestBuilder()
-    if subject: _csr = _csr.subject_name(subject)
+    if subject_name: _csr = _csr.subject_name(subject_name)
     else: _csr = _csr.subject_name(Name([]))
-    if orchid_san: _csr = _csr.add_extension(SubjectAlternativeName([IPAddress(orchid.ip)]), critical=True)
-    if not serialize: return _csr.sign(orchid.private_key, None)
-    return _csr.sign(orchid.private_key, None).public_bytes(serialize)
+    if orchid_san: _csr = _csr.add_extension(SubjectAlternativeName([IPAddress(subject.ip)]), critical=True)
+    if not serialize: return _csr.sign(subject.private_key, None)
+    return _csr.sign(subject.private_key, None).public_bytes(serialize)
 
 
 def certificate(
