@@ -58,7 +58,8 @@ class Orchid:
             rsa_alg: OrchidRsaAlgorithms = 'PS256',
     ) -> COSEKeyInterface:
         _cose_key = COSEKey.from_jwk(self.jwk(private_key, rsa_alg)).to_dict()
-        _cose_key[2] = self.ip.packed  # set as bytes instead of bytes(str); todo: #6.54?
+        # set kid as bytes of ip instead of bytes(str) that was auto-generated from jwk
+        _cose_key[2] = bytes.fromhex('D83650') + self.ip.packed  # Tag 54=0xD83650
         return COSEKey.new(_cose_key)
 
     def jwk(
