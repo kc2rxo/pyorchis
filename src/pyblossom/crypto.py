@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key, l
 
 from src.pyblossom.constant import ContextId, Prefix, SuiteId
 
+
 OrchidPublicKeyAlgorithms = Ed448PublicKey | Ed25519PublicKey | RSAPublicKey | EllipticCurvePublicKey
 OrchidPrivateKeyAlgorithms = Ed448PrivateKey | Ed25519PrivateKey | RSAPrivateKey | EllipticCurvePrivateKey
 OrchidDsaRsaKeySizes = Literal[2048, 4096, 8192]
@@ -20,7 +21,16 @@ OrchidEcdsaCurves = Literal['P-256', 'P-384']
 OrchidEddsaCurves = Literal['Ed448', 'Ed25519']
 
 
-def suite_id_by_public_key_alg(public: OrchidPublicKeyAlgorithms) -> SuiteId:
+def suite_id_from_public_key_alg(public: OrchidPublicKeyAlgorithms) -> SuiteId:
+    """
+    Selects a SuiteID from public key algorithm
+
+    Args:
+        public: public key instance
+
+    Returns:
+        SuiteId instance
+    """
     if isinstance(public, RSAPublicKey):
         return SuiteId.RSA_DSA_SHA256
     elif isinstance(public, EllipticCurvePublicKey):
@@ -36,6 +46,18 @@ def generate_key_pair(
         ecdsa_curve: OrchidEcdsaCurves = 'P-256',
         eddsa_curve: OrchidEddsaCurves = 'Ed25519'
 ) -> tuple[OrchidPublicKeyAlgorithms, OrchidPrivateKeyAlgorithms]:
+    """
+    Generates new instances of public and private keys for a given Orchid Generation Algorithm ID (OGA ID).
+
+    Args:
+        oga_id: selection of SuiteId from HIT or HHIT
+        rsa_key_size: preferred RSA key size (2048, 4069, 8192), default=2048
+        ecdsa_curve: preferred ECDSA curve (NIST P-256, NIST P-384), default=P-256
+        eddsa_curve: preferred EdDSA curve (Ed25519, Ed448), default=Ed25519
+
+    Returns:
+        Instances of public and private keys from cryptography
+    """
     match oga_id:
         case SuiteId.RSA_DSA_SHA256:
             _rsa = rsa.generate_private_key(65537, rsa_key_size)
@@ -58,13 +80,23 @@ def load_pem_key(
         pem_data: bytes,
         password: bytes | None = None
 ) -> tuple[OrchidPublicKeyAlgorithms, OrchidPrivateKeyAlgorithms]:
+    """
+    Loads PEM data to instances of public and private keys.
+
+    Args:
+        pem_data: bytes of PEM data
+        password: optional encryption password, default=None
+
+    Returns:
+        Instances of public and private keys from cryptography
+    """
     if password:
         _private = load_pem_private_key(pem_data, password)
         _public = _private.public_key()
     else:
         _public, _private = load_pem_public_key(pem_data, None), None
     _public: OrchidPublicKeyAlgorithms
-    match suite_id_by_public_key_alg(_public):
+    match suite_id_from_public_key_alg(_public):
         case SuiteId.RSA_DSA_SHA256:
             _public: RSAPublicKey
             _private: RSAPrivateKey
@@ -82,7 +114,16 @@ def load_pem_key(
 
 
 def construct_host_identity(public: OrchidPublicKeyAlgorithms) -> bytes:
-    match suite_id_by_public_key_alg(public):
+    """
+    Host Identity field of HOST_ID parameter from RFC7401.
+
+    Args:
+        public: public key instance to be used.
+
+    Returns:
+        bytes of the Host Identity field of HOST_ID parameter
+    """
+    match suite_id_from_public_key_alg(public):
         case SuiteId.RSA_DSA_SHA256:
             public: RSAPublicKey
             _nums = public.public_numbers()
@@ -112,7 +153,19 @@ def construct_ip(
         info: bytes | None = None,
         ctx_id: ContextId = ContextId.RFC7401
 ) -> IPv6Address:
-    _suite_id = suite_id_by_public_key_alg(public)
+    """
+    Constructs an ORCHID per RFC7401 and RFC9374.
+
+    Args:
+        public: public key instance to be used
+        prefix: Prefix instance to be used
+        info: optional bytes of additional information (per RFC9374), default=None
+        ctx_id: ContextId instance to be used, default=ContextId.RFC7401
+
+    Returns:
+        An instance of IPv6Address containing constructed ORCHID
+    """
+    _suite_id = suite_id_from_public_key_alg(public)
     _prefix_info_oga = _construct_prefix_info_oga(prefix, SuiteId.RSA_DSA_SHA256, info)
     _hih_length = 16 - len(_prefix_info_oga)
     match _suite_id:

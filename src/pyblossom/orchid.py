@@ -17,7 +17,7 @@ from src.pyblossom.crypto import (
     OrchidEddsaCurves,
     generate_key_pair,
     construct_host_identity,
-    suite_id_by_public_key_alg,
+    suite_id_from_public_key_alg,
     construct_ip,
     load_pem_key
 )
@@ -69,7 +69,7 @@ class Orchid:
 
     @property
     def suite_id(self) -> SuiteId:
-        return suite_id_by_public_key_alg(self.public_key)
+        return suite_id_from_public_key_alg(self.public_key)
 
     def cose_key(
             self,
@@ -145,7 +145,7 @@ class Orchid:
             eddsa_curve: preferred EdDSA curve (Ed25519, Ed448), default=Ed25519
 
         Returns:
-            Instance of Orchid
+            Instance of Orchid with HIT
         """
         _orchid = cls()
         _orchid.x, _orchid.d = generate_key_pair(hit_suite_id, rsa_key_size, ecdsa_curve, eddsa_curve)
@@ -174,7 +174,7 @@ class Orchid:
             eddsa_curve: preferred EdDSA curve (Ed25519, Ed448), default=Ed25519
 
         Returns:
-            Instance of Orchid
+            Instance of Orchid with DET
         """
         _orchid = cls()
         _orchid.x, _orchid.d = generate_key_pair(hhit_suite_id, rsa_key_size, ecdsa_curve, eddsa_curve)
