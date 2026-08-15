@@ -10,27 +10,27 @@ The main protocols using ORCHIDs, with dedicated IPv6 prefixes, are the Host Ide
 
 ## Package Features
 
-| Key Algorithm       | Key Sizes or Curves    |
-|---------------------|------------------------|
-| RS256, RS384, RS512 | 2048, 4096, 8192       |
-| ECDSA               | NIST P-256, NIST P-384 |
-| EdDSA               | Ed25519, Ed448         |
+| Key Algorithm       | Key Sizes or Curves    | Underlying Package |
+|---------------------|------------------------|--------------------|
+| RS256, RS384, RS512 | 2048, 4096, 8192       | `cryptography`     |
+| ECDSA               | NIST P-256, NIST P-384 | `cryptography`     |
+| EdDSA               | Ed25519, Ed448         | `cryptography`     |
 
 > Note: Encryption operations are not supported under ORCHID as the cryptographic agility does not include any 
 encryption key algorithms
 
 The following structures can be obtained through the ORCHID package APIs:
 
-| Structure                         | API      | Underlying Package | Reference            |
-|-----------------------------------|----------|--------------------|----------------------|
-| COSE_Sign1                        | `ObjectSigning`   | `cwt`              | RFC9052, Section 4   |
-| COSE_Sign                         | `ObjectSigning`   | `cwt`              | RFC9052, Section 4   |
-| COSE_Key                          | `Orchid` | `cwt`              | RFC9052, Section 7   |
-| JWS                               | `Jose`   | `jwcrypto`         | RFC7515              |
-| JWK                               | `Orchid` | `jwcrypto`         | RFC7517              |
-| X.509 Certificate Signing Request | `X509`   | `cryptography`     | -                    |
-| X.509 Certificate                 | `X509`   | `cryptography`     | -                    |
-| DRIP Endorsement                  | `Drip`   | -                  | RFC9575, Section 4.1 |
+| Structure                         | API                | Underlying Package | Reference            |
+|-----------------------------------|--------------------|--------------------|----------------------|
+| COSE_Key                          | `Orchid`           | `cwt`              | RFC9052, Section 7   |
+| JWK                               | `Orchid`           | `jwcrypto`         | RFC7517              |
+| COSE_Sign1                        | `ObjectSigning`    | `cwt`              | RFC9052, Section 4   |
+| COSE_Sign                         | `ObjectSigning`    | `cwt`              | RFC9052, Section 4   |
+| JWS                               | `ObjectSigning`    | `jwcrypto`         | RFC7515              |
+| X.509 Certificate Signing Request | `x509.csr`         | `cryptography`     | -                    |
+| X.509 Certificate                 | `x509.certificate` | `cryptography`     | -                    |
+| DRIP Endorsement                  | `Drip`             | -                  | RFC9575, Section 4.1 |
 
 All of these support ORCHIDs through their key algorithms for signing but also identify the public keys using ORCHIDs
 in respective fields for key identification (COSE/JOSE with `kid`, X.509 with `Subject Alternative Name: IP6`).
