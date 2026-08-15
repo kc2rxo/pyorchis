@@ -55,7 +55,3 @@ The following structures can be obtained through the ORCHID package APIs:
 
 All of these support ORCHIDs through their key algorithms for signing but also identify the public keys using ORCHIDs
 in respective fields for key identification (COSE/JOSE with `kid`, X.509 with `Subject Alternative Name: IP6`).
-
-## Project Name
-
-https://en.wikipedia.org/wiki/Orchid 
