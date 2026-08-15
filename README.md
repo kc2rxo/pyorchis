@@ -1,4 +1,4 @@
-# pyblossom: General-Use ORCHIDs for Modern Applications & Protocols
+# orchis: General-Use ORCHIDs for Modern Applications & Protocols
 
 Overlay Routable Cryptographic Hash IDentifiers (ORCHIDs) are valid non-routable addresses that are found under 
 specific IANA assigned prefixes out of the IPv6 Special Purpose Address Space. They encode directly cryptographic
