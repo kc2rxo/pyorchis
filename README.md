@@ -22,6 +22,8 @@ This project is designed as a cross-platform (and in the future cross-language) 
 ORCHIDs. It is not intended to be a complete solution but more of a starting point and general toolbox for 
 using of ORCHIDs as part of modern applications and protocols.
 
+> The project is named after the plant family and genus that [orchids](https://en.wikipedia.org/wiki/Orchid) are from.
+
 ## Package Features
 
 This package supports a majority of cryptographic key algorithms that are shared between the HIT Suite ID (RFC7401) and 
@@ -53,3 +55,7 @@ The following structures can be obtained through the ORCHID package APIs:
 
 All of these support ORCHIDs through their key algorithms for signing but also identify the public keys using ORCHIDs
 in respective fields for key identification (COSE/JOSE with `kid`, X.509 with `Subject Alternative Name: IP6`).
+
+## Project Name
+
+https://en.wikipedia.org/wiki/Orchid 
