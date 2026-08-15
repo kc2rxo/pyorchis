@@ -24,29 +24,66 @@ class ObjectSigning:
         self._signers: dict[IPv6Address, Orchid] = {}
 
     def add_signer(self, signer: Orchid) -> None:
+        """
+        Adds an Orchid instance to the internal store.
+
+        Args:
+            signer: Orchid instance.
+
+        Returns:
+            None
+        """
         self._signers.update({signer.ip: signer})
 
     def add_signers(self, signers: list[Orchid] | dict[IPv6Address, Orchid]) -> None:
+        """
+        Adds a list of Orchids or dict of Orchids, indexed by ORCHID IPv6 addresses.
+
+        This function confirms that the dict input type is properly formed with IPv6 addresses as
+        keys and Orchid instances as values.
+
+        The list input uses the Orchids ip attribute as the key for the internal store.
+
+        Args:
+            signers: list of Orchid instances or dict w/IPv6 addresses as key and Orchid instances as value
+
+        Returns:
+            None
+        """
         if isinstance(signers, dict):
             if not all(isinstance(k, IPv6Address) and isinstance(v, Orchid) for k, v in signers.items()):
-                raise ValueError("mixed key/value types in signers: must be IPv6Address: Orchid")
+                raise ValueError("mixed key/value types in signers: must be {IPv6Address: Orchid}")
             self._signers.update(signers)
         else:
             for signer in signers: self.add_signer(signer)
 
-    def remove_signer(self, kid: str | bytes | IPv6Address) -> None:
-        try:
-            _kid = IPv6Address(kid) if not isinstance(kid, IPv6Address) else kid
-            if _kid in self._signers: self._signers.pop(_kid)
-        except ValueError:
-            raise ValueError("kid is not IPv6Address")
+    def remove_signer(self, ip6: str | bytes | IPv6Address) -> bool:
+        """
+        Attempts to remove Orchid instance from store based on key.
 
-    def remove_signers(self, kids: list[str | bytes | IPv6Address]) -> None:
-        for kid in kids: self.remove_signer(kid)
+        Will attempt to translate input parameter to IPv6Address.
+
+        Args:
+            ip6: ORCHID IPv6 address as str, bytes or instance of IPv6Address
+
+        Returns:
+            bool
+        """
+        try:
+            _kid = IPv6Address(ip6) if not isinstance(ip6, IPv6Address) else ip6
+            if _kid in self._signers:
+                self._signers.pop(_kid)
+                return True
+            return False
+        except ValueError:
+            return False
+
+    def remove_signers(self, ip6_list: list[str | bytes | IPv6Address]) -> None:
+        for kid in ip6_list: self.remove_signer(kid)
 
     def get_signer(
             self,
-            kid: IPv6Address,
+            ip6: IPv6Address,
             json: bool = False,
             alg: OrchidRsaAlgorithms = 'PS256'
     ) -> JWK | COSEKeyInterface:
@@ -54,7 +91,7 @@ class ObjectSigning:
         Provides an Orchid instance from the internal store as COSE Key or JWK.
 
         Args:
-            kid: ORCHID IPv6 address to select
+            ip6: ORCHID IPv6 address to select
             json: flag for JWK or COSE Key, default=COSE Key (False)
             alg: selection for RSA algorithm, default=PS256
 
@@ -62,9 +99,9 @@ class ObjectSigning:
             Instance of JWK or COSE Key
         """
         if json:
-            return self._signers[kid].jwk(True, alg)
+            return self._signers[ip6].jwk(True, alg)
         else:
-            return self._signers[kid].cose_key(True, alg)
+            return self._signers[ip6].cose_key(True, alg)
 
     def sign(
             self,
@@ -77,7 +114,7 @@ class ObjectSigning:
 
         Args:
             payload: data bytes to be signed
-            signers: map of internal Orchids (using Key ID) from store and the RSA algorithm to use
+            signers: map of Orchids (using Key ID) from store to select and the RSA algorithm to use
             json: flag for JSON Web Signature or COSE Sign/Sign1
 
         Returns:
@@ -106,7 +143,7 @@ class ObjectSigning:
 
         Args:
             msg: COSE Message to countersign
-            signers: map of internal Orchids (using Key ID) from store and the RSA algorithm to use
+            signers: map of Orchids (using Key ID) from store to select and the RSA algorithm to use
 
         Returns:
             copy of COSE Message countersigned
@@ -149,18 +186,32 @@ class ObjectSigning:
             signers: dict[str | bytes | IPv6Address, OrchidRsaAlgorithms],
             json: bool = False
     ) -> list[JWK] | list[COSEKeyInterface]:
+        """
+        Converts dict key to IPv6 to find Orchid in store, confirms valid RSA Algorithm
+        for Orchid then convert Orchid to JWK or COSE Key.
+
+        Any key that can not be converted to IPv6Address, any key this not found in store, any Orchid that does
+        not have a private key set and any key that requests an invalid RSA Algorithm is ignored.
+
+        Args:
+            signers: map of Orchids (using Key ID) from store to select and the RSA algorithm to use
+            json: flag for JWK or COSE Key, default=COSE Key (False)
+
+        Returns:
+            List of JWK or COSE Keys
+        """
         _signers = []
-        for _kid, _alg in signers.items():
-            if isinstance(_kid, str) or isinstance(_kid, bytes):
+        for _ip6, _alg in signers.items():
+            if isinstance(_ip6, str) or isinstance(_ip6, bytes):
                 try:
-                    __kid = IPv6Address(_kid)
+                    _kid = IPv6Address(_ip6)
                 except ValueError:
                     continue
             else:
-                __kid = _kid
-            if __kid not in self._signers: continue
-            if not self._signers[__kid].has_private: continue
+                _kid = _ip6
+            if _kid not in self._signers: continue
+            if not self._signers[_kid].has_private: continue
             if _alg not in get_args(OrchidRsaAlgorithms): continue
             _alg: OrchidRsaAlgorithms
-            _signers.append(self.get_signer(__kid, json, _alg))
+            _signers.append(self.get_signer(_kid, json, _alg))
         return _signers
