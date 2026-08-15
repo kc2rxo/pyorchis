@@ -16,8 +16,7 @@ def csr(
 ) -> CertificateSigningRequest | bytes:
     if not subject.has_private: raise ValueError('Private key not provided')
     _csr = CertificateSigningRequestBuilder()
-    if subject_name: _csr = _csr.subject_name(subject_name)
-    else: _csr = _csr.subject_name(Name([]))
+    _csr = _csr.subject_name(subject_name)
     if orchid_san: _csr = _csr.add_extension(SubjectAlternativeName([IPAddress(subject.ip)]), critical=True)
     if not serialize: return _csr.sign(subject.private_key, None)
     return _csr.sign(subject.private_key, None).public_bytes(serialize)
