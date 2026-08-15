@@ -1,7 +1,7 @@
 # orchis: General-Use ORCHIDs for Modern Applications & Protocols
 
 Overlay Routable Cryptographic Hash IDentifiers (ORCHIDs) are valid non-routable addresses that are found under 
-specific IANA assigned prefixes out of the IPv6 Special Purpose Address Space. They encode directly cryptographic
+specific IANA assigned prefixes out of the IPv6 Special Purpose Address Space. They encode cryptographic
 agility and optional additional information (such as hierarchy) while acting as a handle to the public portion 
 of an asymmetric keypair.
 
@@ -54,4 +54,4 @@ The following structures can be obtained through the ORCHID package APIs:
 | DRIP Endorsement                  | `Drip`             | -                  | RFC9575, Section 4.1 |
 
 All of these support ORCHIDs through their key algorithms for signing but also identify the public keys using ORCHIDs
-in respective fields for key identification (COSE/JOSE with `kid`, X.509 with `Subject Alternative Name: IP6`).
+in respective fields for key identification (COSE/JOSE with `key id (kid)`, X.509 with `Subject Alternative Name: IP6`).

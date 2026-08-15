@@ -19,20 +19,19 @@ authors = [
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["COPYING.txt"]
-keywords = []
+keywords = [
+    "orchid", "cose", "cose-sign", "cose-sign1", "jose", "jwk", "jws", "hip", "drip", "rfc7401", "rfc9374", "rfc7343"
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-    "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.13",
-    "Topic :: Communications", "Topic :: Internet",
+    "Topic :: Communications", "Topic :: Internet", "Topic :: Security :: Cryptography",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Networking"
 ]
 
 [project.urls]
 Repository = "https://github.com/kc2rxo/orchis.git"
-Issues = "https://github.com/kc2rxo/orchis/issues"
-Changelog = "https://github.com/kc2rxo/orchis/blob/master/CHANGELOG.md"
