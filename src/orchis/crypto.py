@@ -80,18 +80,34 @@ def generate_key_pair(
 
 
 def dump_pem_key(
-        key: OrchisPrivateKeyAlgorithms | OrchisPublicKeyAlgorithms,
-        encoding: serialization.Encoding,
-        fmt: serialization.PublicFormat | serialization.PrivateFormat,
-        encryption: serialization.NoEncryption | serialization.BestAvailableEncryption = serialization.NoEncryption(),
+        key: OrchisPrivateKeyAlgorithms | OrchisPublicKeyAlgorithms | None,
+        password: bytes | None = None,
 ) -> bytes:
-    if isinstance(key, OrchisPrivateKeyAlgorithms) and isinstance(fmt, serialization.PrivateFormat):
+    """
+    All PEMs are PKCS8 for PrivateFormat. RSA uses PublicFormat.Raw, ECDSA uses PublicFormat.UncompressedPoint
+    and EdDSA uses PublicFormat.Raw.
+
+    Encryption is BestAvailableEncryption from cryptography package with provided password.
+
+    Args:
+        key:
+        password:
+
+    Returns:
+        PEM data in bytes
+    """
+    if key is None: raise ValueError('no key specified')
+    if isinstance(key, OrchisPrivateKeyAlgorithms):
         key: OrchisPrivateKeyAlgorithms
-        return key.private_bytes(encoding, fmt, encryption)
+        return key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.BestAvailableEncryption(password) if password else serialization.NoEncryption())
     else:
         key: OrchisPublicKeyAlgorithms
-        fmt: serialization.PublicFormat
-        return key.public_bytes(encoding, fmt)
+        if isinstance(key, (Ed25519PublicKey, RSAPublicKey)): fmt = serialization.PublicFormat.Raw
+        else: fmt = serialization.PublicFormat.UncompressedPoint
+        return key.public_bytes(serialization.Encoding.PEM, fmt)
 
 
 def load_pem_key(

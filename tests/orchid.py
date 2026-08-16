@@ -1,8 +1,6 @@
 import unittest
 from typing import get_args
 
-import cbor2
-
 from src.orchis.constant import SuiteId
 from src.orchis.crypto import OrchisRsaKeySizes, OrchisEcdsaCurves, OrchisEddsaCurves
 from src.orchis.orchid import Orchid

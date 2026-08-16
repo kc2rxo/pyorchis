@@ -3,7 +3,6 @@ from secrets import token_bytes
 from typing import Self, Literal
 
 import cbor2
-from cryptography.hazmat.primitives import serialization
 from cwt import COSEKey
 from cwt.cose_key_interface import COSEKeyInterface
 from jwcrypto.jwk import JWK
@@ -123,11 +122,6 @@ class Orchid:
         """
         Exports Orchid instance as PEM data.
 
-        All PEMs are PKCS8 for PrivateFormat. RSA uses PublicFormat.Raw, ECDSA uses PublicFormat.UncompressedPoint
-        and EdDSA uses PublicFormat.Raw.
-
-        Encryption is BestAvailableEncryption from cryptography package with provided password.
-
         Args:
             private_key: flag for private key
             password: optional password in bytes for encryption
@@ -135,21 +129,7 @@ class Orchid:
         Returns:
             PEM data as bytes
         """
-        _private: bool = private_key and password is not None and self.has_private
-        match self.suite_id:
-            case SuiteId.RSA_DSA_SHA256:
-                _format = serialization.PrivateFormat.PKCS8 if _private else serialization.PublicFormat.Raw
-            case SuiteId.ECDSA_SHA384:
-                _format = serialization.PrivateFormat.PKCS8 if _private else serialization.PublicFormat.UncompressedPoint
-            case SuiteId.EDDSA_CSHAKE128:
-                _format = serialization.PrivateFormat.PKCS8 if _private else serialization.PublicFormat.Raw
-            case _:
-                raise NotImplementedError(f"no PEM encode for {self.suite_id}")
-        _key = self.d if _private else self.x
-        _key: OrchisPublicKeyAlgorithms | OrchisPrivateKeyAlgorithms
-        _enc = serialization.BestAvailableEncryption(
-            password) if _private and password is not None else serialization.NoEncryption()
-        return dump_pem_key(_key, serialization.Encoding.PEM, _format, _enc)
+        return dump_pem_key(self.d if private_key else self.x, password)
 
     def check_integrity(self) -> bool:
         """
