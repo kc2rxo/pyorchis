@@ -1,5 +1,4 @@
 import unittest
-from secrets import token_bytes
 from typing import get_args
 
 from src.orchis.constant import SuiteId
@@ -18,8 +17,8 @@ class MyTestCase(unittest.TestCase):
 
     def test_cose(self):
         self._export_cose()
-        for o in self.exported_cose:
-            _new = Orchid.import_cose_key(o)
+        for cose_key in self.exported_cose:
+            _new = Orchid.import_cose_key(cose_key)
             self.assertTrue(_new.check_integrity(), f"{_new}")
 
     def test_jose(self):

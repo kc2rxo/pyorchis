@@ -1,6 +1,11 @@
+import json
+from base64 import urlsafe_b64encode, urlsafe_b64decode
+from binascii import unhexlify, hexlify
+from copy import deepcopy
 from ipaddress import IPv6Address
-from typing import Literal
+from typing import Literal, Any
 
+import cbor2
 from Crypto.Hash import cSHAKE128, SHA256, SHA384
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
@@ -9,9 +14,6 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey, Ed448PrivateKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
-from cwt import COSEKey
-from cwt.cose_key_interface import COSEKeyInterface
-from jwcrypto.jwk import JWK
 
 from src.orchis.constant import ContextId, Prefix, SuiteId
 
@@ -151,79 +153,29 @@ def load_pem_key(
             raise TypeError('key algorithm not supported')
 
 
-def pyca_to_cose_key(
+def key_to_cose_key(
         key: OrchisPrivateKeyAlgorithms | OrchisPublicKeyAlgorithms | None,
+        key_id: bytes,
         rsa_alg: OrchisRsaAlgorithms = 'PS256',
-) -> COSEKeyInterface:
+        serialize: bool = True,
+) -> bytes | dict[int, Any]:
     """
     Converts a cryptography key to COSE Key format.
 
     Args:
         key: OrchisPrivateKeyAlgorithms
         rsa_alg: OrchisRsaAlgorithms, default='PS256'
-        private: flag to encode private components, default=False
+        key_id: bytes
+        serialize: bool, default=True
 
     Returns:
         COSEKeyInterface of pyca key
     """
-    if key is None: raise TypeError('key not provided')
-    _params = {}
-    if isinstance(key, (RSAPrivateKey, RSAPublicKey)):
-        _params.update({1: 3})
-        if isinstance(key, RSAPrivateKey):
-            _pn = key.private_numbers()
-            _params.update({
-                -1: _int_to_bytes(_pn.public_numbers.n),
-                -2: _int_to_bytes(_pn.public_numbers.e),
-                -3: _int_to_bytes(_pn.d),
-                -4: _int_to_bytes(_pn.p),
-                -5: _int_to_bytes(_pn.q),
-                -6: _int_to_bytes(_pn.dmp1),
-                -7: _int_to_bytes(_pn.dmq1),
-                -8: _int_to_bytes(_pn.iqmp)
-            })
-        else: # public key
-            _params.update({
-                -1: _int_to_bytes(key.public_numbers().n),
-                -2: _int_to_bytes(key.public_numbers().e),
-            })
-        if rsa_alg == 'PS256':
-            _params.update({3: -257})
-        elif rsa_alg == 'PS384':
-            _params.update({3: -258})
-        elif rsa_alg == 'PS512':
-            _params.update({3: -259})
-    elif isinstance(key, (EllipticCurvePrivateKey, EllipticCurvePublicKey)):
-        _params.update({1: 2})
-        if isinstance(key.curve, ec.SECP256R1):
-            _params.update({-1: 1})
-        elif isinstance(key.curve, ec.SECP384R1):
-            _params.update({-1: 2})
-        if isinstance(key, EllipticCurvePrivateKey):
-            _pn = key.private_numbers()
-            _params.update({
-                -2: _int_to_bytes(_pn.public_numbers.x),
-                -3: _int_to_bytes(_pn.public_numbers.y),
-                -4: _int_to_bytes(_pn.private_value)
-            })
-        else:
-            _params.update({
-                -2: _int_to_bytes(key.public_numbers().x),
-                -3: _int_to_bytes(key.public_numbers().y),
-            })
-    elif isinstance(key, (Ed25519PrivateKey, Ed25519PublicKey, Ed448PrivateKey, Ed448PublicKey)):
-        _params.update({1: 1, -1: 6 if isinstance(key, (Ed25519PrivateKey, Ed25519PublicKey)) else 7,})
-        if isinstance(key, (Ed25519PublicKey, Ed448PublicKey)):
-            _params.update({-2: key.public_bytes_raw()})
-        else:
-            _params.update({-2: key.public_key().public_bytes_raw()})
-            _params.update({-3: key.private_bytes_raw()})
-    else:
-        raise TypeError('key algorithm not supported')
-    return COSEKey.new(_params)
+    _params: dict[int, Any] = {2: key_id}
+    return cbor2.dumps(_to_params(_params, key, rsa_alg)) if serialize else _params
 
 
-def cose_key_to_pyca(cose_key: COSEKeyInterface) -> tuple[OrchisPublicKeyAlgorithms, OrchisPrivateKeyAlgorithms | None]:
+def cose_key_to_key(cose_key: bytes) -> tuple[OrchisPublicKeyAlgorithms, OrchisPrivateKeyAlgorithms | None, bytes]:
     """
     Converts a COSE Key into a cryptography key.
 
@@ -231,56 +183,28 @@ def cose_key_to_pyca(cose_key: COSEKeyInterface) -> tuple[OrchisPublicKeyAlgorit
         cose_key: decoded COSE Key
 
     Returns:
-        Instances of public and private keys from cryptography
+        Instances of public and private keys from cryptography and Key ID
     """
-    _key = cose_key.to_dict()
-    if _key[1] == 3:
-        public_numbers = rsa.RSAPublicNumbers(int.from_bytes(_key[-2]), int.from_bytes(_key[-1]))
-        if -3 not in _key or -4 not in _key or -5 not in _key: return public_numbers.public_key(), None
-        private_numbers = rsa.RSAPrivateNumbers(
-            p=int.from_bytes(_key[-4]),
-            q=int.from_bytes(_key[-5]),
-            d=int.from_bytes(_key[-3]),
-            dmp1=int.from_bytes(_key[-3]) % (int.from_bytes(_key[-4]) - 1),
-            dmq1=int.from_bytes(_key[-3]) % (int.from_bytes(_key[-5]) - 1),
-            iqmp=pow(int.from_bytes(_key[-5]), -1, int.from_bytes(_key[-4])),
-            public_numbers=public_numbers
-        )
-        return public_numbers.public_key(), private_numbers.private_key()
-    elif _key[1] == 2:
-        public_numbers = ec.EllipticCurvePublicNumbers(
-            x=int.from_bytes(_key[-2]),
-            y=int.from_bytes(_key[-3]),
-            curve=ec.SECP256R1() if _key[-1] == 1 else ec.SECP384R1(),
-        )
-        if -4 not in _key: return public_numbers.public_key(), None
-        private_numbers = ec.EllipticCurvePrivateNumbers(int.from_bytes(_key[-4]), public_numbers)
-        return public_numbers.public_key(), private_numbers.private_key()
-    elif _key[1] == 1:
-        if _key[-1] == 6:
-            _pub = Ed25519PublicKey.from_public_bytes(_key[-2])
-            if -3 not in _key: return _pub, None
-            return _pub, Ed25519PrivateKey.from_private_bytes(_key[-3])
-        else:
-            _pub = Ed448PublicKey.from_public_bytes(_key[-2])
-            if -3 not in _key: return _pub, None
-            return _pub, Ed448PrivateKey.from_private_bytes(_key[-3])
-    else:
-        raise TypeError('key algorithm not supported')
+    _key = cbor2.loads(cose_key)
+    if not isinstance(_key, dict): raise TypeError('improper COSE Key format')
+    return _from_params(_key) + (_key.get(2, bytes()),)
 
 
-def pyca_to_jwk(
+def key_to_jwk(
         key: OrchisPrivateKeyAlgorithms | OrchisPublicKeyAlgorithms | None,
-        rsa_alg: OrchisRsaAlgorithms = 'PS256'
-) -> JWK:
-    if key is None: raise TypeError('key not provided')
-    _jwk = JWK.from_pyca(key)
-    if isinstance(key, (RSAPublicKey, RSAPrivateKey)): _jwk['alg'] = rsa_alg
-    return _jwk
+        key_id: str,
+        rsa_alg: OrchisRsaAlgorithms = 'PS256',
+        serialize: bool = True
+) -> str | dict[str, Any]:
+    _params = {'kid': key_id}
+    return json.dumps(_to_params(_params, key, rsa_alg)) if serialize else _params
 
 
-def jwk_to_pyca(jwk: JWK) -> tuple[OrchisPublicKeyAlgorithms, OrchisPrivateKeyAlgorithms | None]:
+def jwk_to_key(jwk: str) -> tuple[OrchisPublicKeyAlgorithms, OrchisPrivateKeyAlgorithms | None, str]:
     pass  # todo: removes interdependency on Orchid.import_pem() that is currently in use
+    _jwk = json.loads(jwk)
+    if not isinstance(_jwk, dict): raise TypeError('improper JWK format')
+    return _from_params(_jwk) + (_jwk.get('kid', ''),)
 
 
 def construct_host_identity(public: OrchisPublicKeyAlgorithms) -> bytes:
@@ -413,5 +337,302 @@ def _extract_bits(data: bytes, bits: int) -> bytes:
     return data[m - l:m + l]
 
 
-def _int_to_bytes(val: int) -> bytes:
-    return val.to_bytes((val.bit_length() + 7) // 8, byteorder='big')
+def _int_to_bytes(val: int, base_64: bool = False, bit_size: int | None = None) -> bytes | str:
+    _bytes = val.to_bytes((val.bit_length() + 7) // 8, byteorder='big')
+    if base_64:
+        extend = 0
+        if bit_size is not None:
+            extend = ((bit_size + 7) // 8) * 2
+        hex_val = hex(val).rstrip("L").lstrip("0x")
+        hex_len = len(hex_val)
+        if extend > hex_len:
+            extend -= hex_len
+        else:
+            extend = hex_len % 2
+        encode = urlsafe_b64encode(unhexlify(extend * '0' + hex_val))
+        return encode.decode('utf-8').rstrip('=')
+    return _bytes
+
+
+def _to_params(
+        params: dict[int, Any] | dict[str, Any],
+        key: OrchisPublicKeyAlgorithms | OrchisPrivateKeyAlgorithms | None,
+        rsa_alg: OrchisRsaAlgorithms = 'PS256'
+) -> dict[str, Any] | dict[int, Any]:
+    if key is None: raise ValueError('no key specified')
+    is_jwk = all(isinstance(k, str) for k, _ in params.items())
+    if isinstance(key, (RSAPrivateKey, RSAPublicKey)):
+        _params = _rsa_to_params(key, params, is_jwk, rsa_alg)
+    elif isinstance(key, (EllipticCurvePrivateKey, EllipticCurvePublicKey)):
+        _params = _ecdsa_to_params(key, params, is_jwk)
+    elif isinstance(key, (Ed25519PrivateKey, Ed25519PublicKey, Ed448PrivateKey, Ed448PublicKey)):
+        _params = _eddsa_to_params(key, params, is_jwk)
+    else:
+        raise TypeError('key algorithm not supported')
+    return _params
+
+
+def _rsa_to_params(
+        key: RSAPublicKey | RSAPrivateKey,
+        params: dict[str, Any] | dict[int, Any],
+        is_jwk: bool,
+        rsa_alg: OrchisRsaAlgorithms = 'PS256'
+) -> dict[str, Any] | dict[int, Any]:
+    _params = deepcopy(params)
+    if is_jwk:
+        _params: dict[str, Any]
+        _params.update({'kty': 'RSA'})
+    else:
+        _params: dict[int, Any]
+        _params.update({1: 3})
+    if isinstance(key, RSAPrivateKey):
+        _pn = key.private_numbers()
+        if is_jwk:
+            _params.update({
+                'n': _int_to_bytes(_pn.public_numbers.n, True),
+                'e': _int_to_bytes(_pn.public_numbers.e, True),
+                'd': _int_to_bytes(_pn.d, True),
+                'p': _int_to_bytes(_pn.p, True),
+                'q': _int_to_bytes(_pn.q, True),
+                'dp': _int_to_bytes(_pn.dmp1, True),
+                'dq': _int_to_bytes(_pn.dmq1, True),
+                'qi': _int_to_bytes(_pn.iqmp, True)
+            })
+        else:
+            _params: dict[int, Any]
+            _params.update({
+                -1: _int_to_bytes(_pn.public_numbers.n),
+                -2: _int_to_bytes(_pn.public_numbers.e),
+                -3: _int_to_bytes(_pn.d),
+                -4: _int_to_bytes(_pn.p),
+                -5: _int_to_bytes(_pn.q),
+                -6: _int_to_bytes(_pn.dmp1),
+                -7: _int_to_bytes(_pn.dmq1),
+                -8: _int_to_bytes(_pn.iqmp)
+            })
+    else:  # public key
+        if is_jwk:
+            _params.update({
+                'n': _int_to_bytes(key.public_numbers().n, True),
+                'e': _int_to_bytes(key.public_numbers().e, True)
+            })
+        else:
+            _params: dict[int, Any]
+            _params.update({
+                -1: _int_to_bytes(key.public_numbers().n),
+                -2: _int_to_bytes(key.public_numbers().e),
+            })
+    if is_jwk:
+        _params.update({'alg': rsa_alg})
+    elif rsa_alg == 'PS256':
+        _params: dict[int, Any]
+        _params.update({3: -257})
+    elif rsa_alg == 'PS384':
+        _params: dict[int, Any]
+        _params.update({3: -258})
+    elif rsa_alg == 'PS512':
+        _params: dict[int, Any]
+        _params.update({3: -259})
+    return _params
+
+
+def _ecdsa_to_params(
+        key: EllipticCurvePublicKey | EllipticCurvePrivateKey,
+        _params: dict[str, Any] | dict[int, Any],
+        is_jwk: bool
+) -> dict[str, Any] | dict[int, Any]:
+    if is_jwk:
+        _params.update({'kty': 'EC'})
+    else:
+        _params: dict[int, Any]
+        _params.update({1: 2})
+    if isinstance(key.curve, ec.SECP256R1):
+        if is_jwk:
+            _params.update({'crv': 'P-256'})
+        else:
+            _params: dict[int, Any]
+            _params.update({-1: 1})
+    elif isinstance(key.curve, ec.SECP384R1):
+        if is_jwk:
+            _params.update({'crv': 'P-384'})
+        else:
+            _params: dict[int, Any]
+            _params.update({-1: 2})
+    if isinstance(key, EllipticCurvePrivateKey):
+        _pn = key.private_numbers()
+        if is_jwk:
+            _params.update({
+                'x': _int_to_bytes(_pn.public_numbers.x, True, _pn.public_numbers.curve.key_size),
+                'y': _int_to_bytes(_pn.public_numbers.y, True, _pn.public_numbers.curve.key_size),
+                'd': _int_to_bytes(_pn.private_value, True, _pn.public_numbers.curve.key_size),
+            })
+        else:
+            _params: dict[int, Any]
+            _params.update({
+                -2: _int_to_bytes(_pn.public_numbers.x),
+                -3: _int_to_bytes(_pn.public_numbers.y),
+                -4: _int_to_bytes(_pn.private_value)
+            })
+    else:
+        if is_jwk:
+            _params.update({
+                'x': _int_to_bytes(key.public_numbers().x, True, key.public_numbers().curve.key_size),
+                'y': _int_to_bytes(key.public_numbers().y, True, key.public_numbers().curve.key_size),
+            })
+        else:
+            _params: dict[int, Any]
+            _params.update({
+                -2: _int_to_bytes(key.public_numbers().x),
+                -3: _int_to_bytes(key.public_numbers().y),
+            })
+    return _params
+
+
+def _eddsa_to_params(
+        key: Ed25519PublicKey | Ed448PublicKey| Ed25519PrivateKey | Ed448PrivateKey,
+        _params: dict[str, Any] | dict[int, Any],
+        is_jwk: bool
+) -> dict[str, Any] | dict[int, Any]:
+    if is_jwk:
+        _params.update({
+            'kty': 'OKP',
+            'crv': 'Ed25519' if isinstance(key, (Ed25519PrivateKey, Ed25519PublicKey)) else 'Ed448'
+        })
+    else:
+        _params: dict[int, Any]
+        _params.update({
+            1: 1,
+            -1: 6 if isinstance(key, (Ed25519PrivateKey, Ed25519PublicKey)) else 7
+        })
+    if isinstance(key, (Ed25519PublicKey, Ed448PublicKey)):
+        if is_jwk:
+            _params.update({'x': urlsafe_b64encode(key.public_bytes_raw()).decode('utf-8')})
+        else:
+            _params: dict[int, Any]
+            _params.update({-2: key.public_bytes_raw()})
+    else:
+        if is_jwk:
+            _params.update({
+                'x': urlsafe_b64encode(key.public_key().public_bytes_raw()).decode('utf-8'),
+                'd': urlsafe_b64encode(key.private_bytes_raw()).decode('utf-8')
+            })
+        else:
+            _params: dict[int, Any]
+            _params.update({
+                -2: key.public_key().public_bytes_raw(),
+                -3: key.private_bytes_raw()
+            })
+    return _params
+
+
+def _from_params(params: dict[int, Any] | dict[str, Any]) -> tuple[OrchisPublicKeyAlgorithms, OrchisPrivateKeyAlgorithms | None]:
+    if all(isinstance(k, int) for k, _ in params.items()):
+        if params[1] == 3: return _rsa_from_params(params)
+        elif params[1] == 2: return _ecdsa_from_params(params)
+        elif params[1] == 1: return _eddsa_from_params(params)
+        else:
+            raise TypeError('key algorithm not supported')
+    else:
+        params: dict[str, Any]
+        if params['kty'] == 'RSA': return _rsa_from_params(params)
+        elif params['kty'] == 'EC': return _ecdsa_from_params(params)
+        elif params['kty'] == 'OKP': return _eddsa_from_params(params)
+        else:
+            raise TypeError('key algorithm not supported')
+
+
+def _kid_from_params(params: dict[int, Any] | dict[str, Any]) -> bytes | str:
+    if all(isinstance(k, int) for k, _ in params.items()):
+        params: dict[int, Any]
+        return params.get(2, bytes())
+    else:
+        params: dict[str, Any]
+        return params.get('kid', '')
+
+
+def _rsa_from_params(params: dict[int, Any] | dict[str, Any]) -> tuple[RSAPublicKey, RSAPrivateKey | None]:
+    if all(isinstance(k, int) for k, _ in params.items()):
+        public_numbers = rsa.RSAPublicNumbers(int.from_bytes(params[-2]), int.from_bytes(params[-1]))
+        if -3 not in params or -4 not in params or -5 not in params: return public_numbers.public_key(), None
+        private_numbers = rsa.RSAPrivateNumbers(
+            p=int.from_bytes(params[-4]),
+            q=int.from_bytes(params[-5]),
+            d=int.from_bytes(params[-3]),
+            dmp1=int.from_bytes(params[-3]) % (int.from_bytes(params[-4]) - 1),
+            dmq1=int.from_bytes(params[-3]) % (int.from_bytes(params[-5]) - 1),
+            iqmp=pow(int.from_bytes(params[-5]), -1, int.from_bytes(params[-4])),
+            public_numbers=public_numbers
+        )
+        return public_numbers.public_key(), private_numbers.private_key()
+    else:
+        params: dict[str, Any]
+        public_numbers = rsa.RSAPublicNumbers(
+            int(hexlify(_base64url_decode(params['e'])), 16),
+            int(hexlify(_base64url_decode(params['n'])), 16)
+        )
+        if 'd' not in params or 'p' not in params or 'q' not in params: return public_numbers.public_key(), None
+        private_numbers = rsa.RSAPrivateNumbers(
+            p=int(hexlify(_base64url_decode(params['p'])), 16),
+            q=int(hexlify(_base64url_decode(params['q'])), 16),
+            d=int(hexlify(_base64url_decode(params['d'])), 16),
+            dmp1=int(hexlify(_base64url_decode(params['d'])), 16) % (int(hexlify(_base64url_decode(params['p'])), 16) - 1),
+            dmq1=int(hexlify(_base64url_decode(params['d'])), 16) % (int(hexlify(_base64url_decode(params['q'])), 16) - 1),
+            iqmp=pow(int(hexlify(_base64url_decode(params['q'])), 16), -1,  int(hexlify(_base64url_decode(params['p'])), 16)),
+            public_numbers=public_numbers
+        )
+        return public_numbers.public_key(), private_numbers.private_key()
+
+
+def _ecdsa_from_params(params: dict[int, Any] | dict[str, Any]) -> tuple[EllipticCurvePublicKey, EllipticCurvePrivateKey | None]:
+    if all(isinstance(k, int) for k, _ in params.items()):
+        public_numbers = ec.EllipticCurvePublicNumbers(
+            x=int.from_bytes(params[-2]),
+            y=int.from_bytes(params[-3]),
+            curve=ec.SECP256R1() if params[-1] == 1 else ec.SECP384R1(),
+        )
+        if -4 not in params: return public_numbers.public_key(), None
+        private_numbers = ec.EllipticCurvePrivateNumbers(int.from_bytes(params[-4]), public_numbers)
+        return public_numbers.public_key(), private_numbers.private_key()
+    else:
+        params: dict[str, Any]
+        public_numbers = ec.EllipticCurvePublicNumbers(
+            x=int(hexlify(_base64url_decode(params['x'])), 16),
+            y=int(hexlify(_base64url_decode(params['y'])), 16),
+            curve=ec.SECP256R1() if params['crv'] == 'P-256' else ec.SECP384R1(),
+        )
+        if 'd' not in params: return public_numbers.public_key(), None
+        private_numbers = ec.EllipticCurvePrivateNumbers(int(hexlify(_base64url_decode(params['d'])), 16), public_numbers)
+        return public_numbers.public_key(), private_numbers.private_key()
+
+
+def _eddsa_from_params(params: dict[int, Any] | dict[str, Any]) -> tuple[Ed25519PublicKey | Ed448PublicKey, Ed25519PrivateKey | Ed448PrivateKey | None]:
+    if all(isinstance(k, int) for k, _ in params.items()):
+        if params[-1] == 6:
+            _pub = Ed25519PublicKey.from_public_bytes(params[-2])
+            if -3 not in params: return _pub, None
+            return _pub, Ed25519PrivateKey.from_private_bytes(params[-3])
+        else:
+            _pub = Ed448PublicKey.from_public_bytes(params[-2])
+            if -3 not in params: return _pub, None
+            return _pub, Ed448PrivateKey.from_private_bytes(params[-3])
+    else:
+        params: dict[str, Any]
+        if params['crv'] == 'Ed25519':
+            _pub = Ed25519PublicKey.from_public_bytes(_base64url_decode(params['x']))
+            if 'd' not in params: return _pub, None
+            return _pub, Ed25519PrivateKey.from_private_bytes(_base64url_decode(params['d']))
+        else:
+            _pub = Ed448PublicKey.from_public_bytes(_base64url_decode(params['x']))
+            if 'd' not in params: return _pub, None
+            return _pub, Ed448PrivateKey.from_private_bytes(_base64url_decode(params['d']))
+
+
+def _base64url_decode(payload: str) -> bytes:
+    size = len(payload) % 4
+    if size == 2:
+        payload += '=='
+    elif size == 3:
+        payload += '='
+    elif size != 0:
+        raise ValueError('Invalid base64 string')
+    return urlsafe_b64decode(payload.encode('utf-8'))

@@ -1,13 +1,8 @@
 from ipaddress import IPv6Address
-from secrets import token_bytes
-from typing import Self, Literal
+from typing import Self, Any
 
-import cbor2
-from cwt import COSEKey
-from cwt.cose_key_interface import COSEKeyInterface
-from jwcrypto.jwk import JWK
 
-from orchis.crypto import pyca_to_cose_key, pyca_to_jwk
+from orchis.crypto import key_to_cose_key, key_to_jwk, jwk_to_key
 from src.orchis.constant import SuiteId, ContextId, Prefix
 from src.orchis.crypto import (
     OrchisPrivateKeyAlgorithms,
@@ -20,7 +15,7 @@ from src.orchis.crypto import (
     construct_host_identity,
     suite_id_from_public_key_alg,
     construct_ip,
-    load_pem_key, dump_pem_key, load_key_id, cose_key_to_pyca
+    load_pem_key, dump_pem_key, load_key_id, cose_key_to_key
 )
 
 
@@ -76,43 +71,49 @@ class Orchid:
             self,
             private_key: bool = False,
             rsa_alg: OrchisRsaAlgorithms = 'PS256',
-            serialize: bool = False,
-    ) -> COSEKeyInterface | bytes | None:
+            serialize: bool = False
+    ) -> bytes | dict[int, Any]:
         """
         Generates a COSE Key for use with COSE applications, specifically the cwt package.
 
         Args:
             private_key: flag to include private key, default=False
             rsa_alg: selection for RSA algorithm, default=PS256
-            serialize: flag to serialize to bytes, default=False
+            serialize: bool, default=True
 
         Returns:
-            cwt.COSEKeyInterface instance
+            bytes
         """
-        _cose_key = pyca_to_cose_key(self.d if private_key else self.x, rsa_alg).to_dict()
-        _cose_key[2] = bytes.fromhex('D83650') + self.ip.packed  # set Key ID to Tag 54 w/IP6 = 0xD83650
-        return cbor2.dumps(COSEKey.new(_cose_key).to_dict()) if serialize else COSEKey.new(_cose_key)
+        return key_to_cose_key(
+            self.d if private_key and self.has_private else self.x,
+            bytes.fromhex('D83650') + self.ip.packed, # set Key ID to Tag 54 w/IP6 = 0xD83650
+            rsa_alg,
+            serialize
+        )
 
     def jwk(
             self,
             private_key: bool = False,
             rsa_alg: OrchisRsaAlgorithms = 'PS256',
             serialize: bool = False
-    ) -> JWK | str:
+    ) -> str | dict[str, Any]:
         """
         Generates a JSON Web Key for use with JOSE applications, specifically the jwcrypto package.
 
         Args:
             private_key: flag to include private key, default=False
             rsa_alg: selection for RSA algorithm, default=PS256
-            serialize: flag to serialize to str, default=False
+            serialize: bool, default=True
 
         Returns:
-            jwcrypto.JWK instance
+            str
         """
-        _jwk = pyca_to_jwk(self.d if private_key else self.x, rsa_alg)
-        _jwk['kid'] = self.ip.compressed  # todo: exploded?
-        return _jwk.export(private_key) if serialize else _jwk
+        return key_to_jwk(
+            self.d if private_key and self.has_private else self.x,
+            self.ip.compressed,
+            rsa_alg,
+            serialize
+        )
 
     def pem(
             self,
@@ -219,10 +220,9 @@ class Orchid:
         Returns:
             Instance of Orchid with COSE Key.
         """
-        _cose_key = COSEKey.from_bytes(cose_key)
         _orchid = cls()
-        _orchid.x, _orchid.d = cose_key_to_pyca(_cose_key)
-        _orchid.ip = load_key_id(_cose_key.kid, _orchid.x, prefix, info)
+        _orchid.x, _orchid.d, _kid = cose_key_to_key(cose_key)
+        _orchid.ip = load_key_id(_kid, _orchid.x, prefix, info)
         return _orchid
 
     @classmethod
@@ -244,15 +244,10 @@ class Orchid:
         Returns:
             Instance of Orchid loaded through JWK
         """
-        _jwk = JWK.from_json(jwk)
-        _password: bytes | None = token_bytes(32) if _jwk.has_private else None
-        return cls.import_pem(
-            _jwk.export_to_pem(Literal[True] if _jwk.has_private else False, _password),
-            _password,
-            _jwk['kid'],
-            prefix,
-            info
-        )
+        _orchid = cls()
+        _orchid.x, _orchid.d, _kid = jwk_to_key(jwk)
+        _orchid.ip = load_key_id(_kid, _orchid.x, prefix, info)
+        return _orchid
 
     @classmethod
     def import_pem(
