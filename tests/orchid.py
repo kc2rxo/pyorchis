@@ -1,4 +1,5 @@
 import unittest
+from secrets import token_bytes
 from typing import get_args
 
 from src.orchis.constant import SuiteId
@@ -13,6 +14,7 @@ class MyTestCase(unittest.TestCase):
 
         self.exported_jose = []
         self.exported_cose = []
+        self.exported_pem = []
 
     def test_cose(self):
         self._export_cose()
@@ -26,6 +28,12 @@ class MyTestCase(unittest.TestCase):
             _new = Orchid.import_jwk(jwk)
             self.assertTrue(_new.check_integrity(), f"{_new}")
 
+    def test_pem(self):
+        self._export_pem()
+        for pem in self.exported_pem:
+            _new = Orchid.import_pem(pem)
+            self.assertTrue(_new.check_integrity(), f"{_new}")
+
     def _export_jose(self):
         for o in self.hits + self.dets:
             self.exported_jose.append(o.jwk(serialize=True))
@@ -35,6 +43,11 @@ class MyTestCase(unittest.TestCase):
         for o in self.hits + self.dets:
             self.exported_cose.append(o.cose_key(serialize=True))
             self.exported_cose.append(o.cose_key(True, serialize=True))
+
+    def _export_pem(self):
+        for o in self.hits + self.dets:
+            self.exported_cose.append(o.pem())
+            self.exported_cose.append(o.pem(True))
 
     @staticmethod
     def _generate_hits() -> list[Orchid]:

@@ -116,7 +116,7 @@ class Orchid:
 
     def pem(
             self,
-            private_key: bool,
+            private_key: bool = False,
             password: bytes | None = None
     ) -> bytes:
         """

@@ -84,7 +84,7 @@ def dump_pem_key(
         password: bytes | None = None,
 ) -> bytes:
     """
-    All PEMs are PKCS8 for PrivateFormat. RSA uses PublicFormat.Raw, ECDSA uses PublicFormat.UncompressedPoint
+    All PEMs are PKCS8 for PrivateFormat. RSA uses PublicFormat.PKCS1, ECDSA uses PublicFormat.SubjectPublicKeyInfo
     and EdDSA uses PublicFormat.Raw.
 
     Encryption is BestAvailableEncryption from cryptography package with provided password.
@@ -105,8 +105,12 @@ def dump_pem_key(
             serialization.BestAvailableEncryption(password) if password else serialization.NoEncryption())
     else:
         key: OrchisPublicKeyAlgorithms
-        if isinstance(key, (Ed25519PublicKey, RSAPublicKey)): fmt = serialization.PublicFormat.Raw
-        else: fmt = serialization.PublicFormat.UncompressedPoint
+        if isinstance(key, RSAPublicKey):
+            fmt = serialization.PublicFormat.PKCS1
+        elif isinstance(key, Ed25519PublicKey):
+            fmt = serialization.PublicFormat.Raw
+        else:
+            fmt = serialization.PublicFormat.SubjectPublicKeyInfo
         return key.public_bytes(serialization.Encoding.PEM, fmt)
 
 
