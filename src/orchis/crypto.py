@@ -9,6 +9,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey, Ed448PrivateKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
+from cwt import COSEKey
+from cwt.cose_key_interface import COSEKeyInterface
+from jwcrypto.jwk import JWK
 
 from src.orchis.constant import ContextId, Prefix, SuiteId
 
@@ -76,6 +79,21 @@ def generate_key_pair(
     return _public, _private
 
 
+def dump_pem_key(
+        key: OrchisPrivateKeyAlgorithms | OrchisPublicKeyAlgorithms,
+        encoding: serialization.Encoding,
+        fmt: serialization.PublicFormat | serialization.PrivateFormat,
+        encryption: serialization.NoEncryption | serialization.BestAvailableEncryption = serialization.NoEncryption(),
+) -> bytes:
+    if isinstance(key, OrchisPrivateKeyAlgorithms) and isinstance(fmt, serialization.PrivateFormat):
+        key: OrchisPrivateKeyAlgorithms
+        return key.private_bytes(encoding, fmt, encryption)
+    else:
+        key: OrchisPublicKeyAlgorithms
+        fmt: serialization.PublicFormat
+        return key.public_bytes(encoding, fmt)
+
+
 def load_pem_key(
         pem_data: bytes,
         password: bytes | None = None
@@ -113,6 +131,138 @@ def load_pem_key(
             raise TypeError('key algorithm not supported')
 
 
+def pyca_to_cose_key(
+        key: OrchisPrivateKeyAlgorithms | OrchisPublicKeyAlgorithms | None,
+        rsa_alg: OrchisRsaAlgorithms = 'PS256',
+) -> COSEKeyInterface:
+    """
+    Converts a cryptography key to COSE Key format.
+
+    Args:
+        key: OrchisPrivateKeyAlgorithms
+        rsa_alg: OrchisRsaAlgorithms, default='PS256'
+        private: flag to encode private components, default=False
+
+    Returns:
+        COSEKeyInterface of pyca key
+    """
+    if key is None: raise TypeError('key not provided')
+    _params = {}
+    if isinstance(key, (RSAPrivateKey, RSAPublicKey)):
+        _params.update({1: 3})
+        if isinstance(key, RSAPrivateKey):
+            _pn = key.private_numbers()
+            _params.update({
+                -1: _int_to_bytes(_pn.public_numbers.n),
+                -2: _int_to_bytes(_pn.public_numbers.e),
+                -3: _int_to_bytes(_pn.d),
+                -4: _int_to_bytes(_pn.p),
+                -5: _int_to_bytes(_pn.q),
+                -6: _int_to_bytes(_pn.dmp1),
+                -7: _int_to_bytes(_pn.dmq1),
+                -8: _int_to_bytes(_pn.iqmp)
+            })
+        else: # public key
+            _params.update({
+                -1: _int_to_bytes(key.public_numbers().n),
+                -2: _int_to_bytes(key.public_numbers().e),
+            })
+        if rsa_alg == 'PS256':
+            _params.update({3: -257})
+        elif rsa_alg == 'PS384':
+            _params.update({3: -258})
+        elif rsa_alg == 'PS512':
+            _params.update({3: -259})
+    elif isinstance(key, (EllipticCurvePrivateKey, EllipticCurvePublicKey)):
+        _params.update({1: 2})
+        if isinstance(key.curve, ec.SECP256R1):
+            _params.update({-1: 1})
+        elif isinstance(key.curve, ec.SECP384R1):
+            _params.update({-1: 2})
+        if isinstance(key, EllipticCurvePrivateKey):
+            _pn = key.private_numbers()
+            _params.update({
+                -2: _int_to_bytes(_pn.public_numbers.x),
+                -3: _int_to_bytes(_pn.public_numbers.y),
+                -4: _int_to_bytes(_pn.private_value)
+            })
+        else:
+            _params.update({
+                -2: _int_to_bytes(key.public_numbers().x),
+                -3: _int_to_bytes(key.public_numbers().y),
+            })
+    elif isinstance(key, (Ed25519PrivateKey, Ed25519PublicKey, Ed448PrivateKey, Ed448PublicKey)):
+        _params.update({1: 1, -1: 6 if isinstance(key, (Ed25519PrivateKey, Ed25519PublicKey)) else 7,})
+        if isinstance(key, (Ed25519PublicKey, Ed448PublicKey)):
+            _params.update({-2: key.public_bytes_raw()})
+        else:
+            _params.update({-2: key.public_key().public_bytes_raw()})
+            _params.update({-3: key.private_bytes_raw()})
+    else:
+        raise TypeError('key algorithm not supported')
+    return COSEKey.new(_params)
+
+
+def cose_key_to_pyca(cose_key: COSEKeyInterface) -> tuple[OrchisPublicKeyAlgorithms, OrchisPrivateKeyAlgorithms | None]:
+    """
+    Converts a COSE Key into a cryptography key.
+
+    Args:
+        cose_key: decoded COSE Key
+
+    Returns:
+        Instances of public and private keys from cryptography
+    """
+    _key = cose_key.to_dict()
+    if _key[1] == 3:
+        public_numbers = rsa.RSAPublicNumbers(int.from_bytes(_key[-2]), int.from_bytes(_key[-1]))
+        if -3 not in _key or -4 not in _key or -5 not in _key: return public_numbers.public_key(), None
+        private_numbers = rsa.RSAPrivateNumbers(
+            p=int.from_bytes(_key[-4]),
+            q=int.from_bytes(_key[-5]),
+            d=int.from_bytes(_key[-3]),
+            dmp1=int.from_bytes(_key[-3]) % (int.from_bytes(_key[-4]) - 1),
+            dmq1=int.from_bytes(_key[-3]) % (int.from_bytes(_key[-5]) - 1),
+            iqmp=pow(int.from_bytes(_key[-5]), -1, int.from_bytes(_key[-4])),
+            public_numbers=public_numbers
+        )
+        return public_numbers.public_key(), private_numbers.private_key()
+    elif _key[1] == 2:
+        public_numbers = ec.EllipticCurvePublicNumbers(
+            x=int.from_bytes(_key[-2]),
+            y=int.from_bytes(_key[-3]),
+            curve=ec.SECP256R1() if _key[-1] == 1 else ec.SECP384R1(),
+        )
+        if -4 not in _key: return public_numbers.public_key(), None
+        private_numbers = ec.EllipticCurvePrivateNumbers(int.from_bytes(_key[-4]), public_numbers)
+        return public_numbers.public_key(), private_numbers.private_key()
+    elif _key[1] == 1:
+        if _key[-1] == 6:
+            _pub = Ed25519PublicKey.from_public_bytes(_key[-2])
+            if -3 not in _key: return _pub, None
+            return _pub, Ed25519PrivateKey.from_private_bytes(_key[-3])
+        else:
+            _pub = Ed448PublicKey.from_public_bytes(_key[-2])
+            if -3 not in _key: return _pub, None
+            return _pub, Ed448PrivateKey.from_private_bytes(_key[-3])
+    else:
+        raise TypeError('key algorithm not supported')
+
+
+def pyca_to_jwk(
+        key: OrchisPrivateKeyAlgorithms | OrchisPublicKeyAlgorithms | None,
+        rsa_alg: OrchisRsaAlgorithms = 'PS256'
+) -> JWK:
+    if key is None: raise TypeError('key not provided')
+    _jwk = JWK.from_pyca(key)
+    if isinstance(key, (RSAPublicKey, RSAPrivateKey)): _jwk['alg'] = rsa_alg
+    return _jwk
+
+
+def jwk_to_pyca(jwk: JWK) -> tuple[OrchisPublicKeyAlgorithms, OrchisPrivateKeyAlgorithms | None]:
+    pass  # todo: removes interdependency on Orchid.import_pem() that is currently in use
+
+
 def construct_host_identity(public: OrchisPublicKeyAlgorithms) -> bytes:
     """
     Host Identity field of HOST_ID parameter from RFC7401.
@@ -145,6 +295,36 @@ def construct_host_identity(public: OrchisPublicKeyAlgorithms) -> bytes:
             return _curve + public.public_bytes_raw()
         case _:
             raise TypeError('key algorithm not supported')
+
+
+def load_key_id(
+        kid: str | bytes | None,
+        public: OrchisPublicKeyAlgorithms,
+        prefix: Prefix = Prefix.HIT,
+        info: bytes | None = None
+) -> IPv6Address:
+    """
+    Attempts to load a COSE/JOSE Key ID into an IPv6 address. Otherwise uses public key
+    and parameters to create new Key ID based on ORCHID.
+
+    Args:
+        kid: existing Key ID from COSE/JOSE
+        public: instance of OrchisPublicKeyAlgorithms to use to create new Key ID
+        prefix: optional Prefix to use if JWK does not have an ORCHID Key ID, default=Prefix.HIT
+        info: optional additional info to use if JWK does not have an ORCHID Key ID, default=None
+
+    Returns:
+        An IPv6 Address instance with ORCHID
+    """
+    try:
+        return IPv6Address(kid)
+    except ValueError:
+        return construct_ip(
+            public,
+            prefix,
+            info,
+            ContextId.RFC7401 if prefix is Prefix.HIT else ContextId.RFC9374
+        )
 
 
 def construct_ip(
@@ -211,3 +391,7 @@ def _extract_bits(data: bytes, bits: int) -> bytes:
     m = len(data) // 2  # find middle byte
     l = (bits // 8) // 2  # half number of bytes needed
     return data[m - l:m + l]
+
+
+def _int_to_bytes(val: int) -> bytes:
+    return val.to_bytes((val.bit_length() + 7) // 8, byteorder='big')

@@ -84,7 +84,7 @@ class ObjectSigning:
     def get_signer(
             self,
             ip6: IPv6Address,
-            json: bool = False,
+            jwk: bool = False,
             alg: OrchisRsaAlgorithms = 'PS256'
     ) -> JWK | COSEKeyInterface:
         """
@@ -92,13 +92,13 @@ class ObjectSigning:
 
         Args:
             ip6: ORCHID IPv6 address to select
-            json: flag for JWK or COSE Key, default=COSE Key (False)
+            jwk: flag for JWK or COSE Key, default=COSE Key (False)
             alg: selection for RSA algorithm, default=PS256
 
         Returns:
             Instance of JWK or COSE Key
         """
-        if json:
+        if jwk:
             return self._signers[ip6].jwk(True, alg)
         else:
             return self._signers[ip6].cose_key(True, alg)
@@ -107,7 +107,7 @@ class ObjectSigning:
             self,
             payload: bytes,
             signers: dict[str | bytes | IPv6Address, OrchisRsaAlgorithms],
-            json: bool = False
+            jws: bool = False
     ) -> JWS | COSEMessage:
         """
         Creates a JWS or COSE Message instance that is signed by selected Orchids.
@@ -115,14 +115,14 @@ class ObjectSigning:
         Args:
             payload: data bytes to be signed
             signers: map of Orchids (using Key ID) from store to select and the RSA algorithm to use
-            json: flag for JSON Web Signature or COSE Sign/Sign1
+            jws: flag for JSON Web Signature or COSE Sign/Sign1
 
         Returns:
             Instance of JWS or COSE Message with Sign/Sign1
         """
-        _signers = self._prepare_signers(signers, json)
+        _signers = self._prepare_signers(signers, jws)
         if len(_signers) == 0: raise ValueError("no valid signers")
-        if json:
+        if jws:
             _jws = JWS()
             for signer in _signers: _jws.add_signature(signer, signer['alg'], payload)
             return _jws
@@ -184,7 +184,7 @@ class ObjectSigning:
     def _prepare_signers(
             self,
             signers: dict[str | bytes | IPv6Address, OrchisRsaAlgorithms],
-            json: bool = False
+            jwk: bool = False
     ) -> list[JWK] | list[COSEKeyInterface]:
         """
         Converts dict key to IPv6 to find Orchid in store, confirms valid RSA Algorithm
@@ -195,7 +195,7 @@ class ObjectSigning:
 
         Args:
             signers: map of Orchids (using Key ID) from store to select and the RSA algorithm to use
-            json: flag for JWK or COSE Key, default=COSE Key (False)
+            jwk: flag for JWK or COSE Key, default=COSE Key (False)
 
         Returns:
             List of JWK or COSE Keys
@@ -213,5 +213,5 @@ class ObjectSigning:
             if not self._signers[_kid].has_private: continue
             if _alg not in get_args(OrchisRsaAlgorithms): continue
             _alg: OrchisRsaAlgorithms
-            _signers.append(self.get_signer(_kid, json, _alg))
+            _signers.append(self.get_signer(_kid, jwk, _alg))
         return _signers

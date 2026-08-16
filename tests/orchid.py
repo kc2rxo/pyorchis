@@ -1,6 +1,8 @@
 import unittest
 from typing import get_args
 
+import cbor2
+
 from src.orchis.constant import SuiteId
 from src.orchis.crypto import OrchisRsaKeySizes, OrchisEcdsaCurves, OrchisEddsaCurves
 from src.orchis.orchid import Orchid
@@ -14,22 +16,27 @@ class MyTestCase(unittest.TestCase):
         self.exported_jose = []
         self.exported_cose = []
 
-    def test_export_jose(self):
-        for o in self.hits + self.dets:
-            self.exported_jose.append(o.jwk().export())
-            self.exported_jose.append(o.jwk().export(False))
-            self.exported_jose.append(o.jwk(True).export(False))
-            self.exported_jose.append(o.jwk(True).export())
+    def test_cose(self):
+        self._export_cose()
+        for o in self.exported_cose:
+            _new = Orchid.import_cose_key(o)
+            self.assertTrue(_new.check_integrity(), f"{_new}")
 
-    def test_export_cose(self):
-        for o in self.hits + self.dets:
-            self.exported_jose.append(o.cose_key().to_dict())
-            self.exported_jose.append(o.cose_key(True).to_dict())
-
-    def test_import_jose(self):
+    def test_jose(self):
+        self._export_jose()
         for jwk in self.exported_jose:
             _new = Orchid.import_jwk(jwk)
             self.assertTrue(_new.check_integrity(), f"{_new}")
+
+    def _export_jose(self):
+        for o in self.hits + self.dets:
+            self.exported_jose.append(o.jwk(serialize=True))
+            self.exported_jose.append(o.jwk(True, serialize=True))
+
+    def _export_cose(self):
+        for o in self.hits + self.dets:
+            self.exported_cose.append(o.cose_key(serialize=True))
+            self.exported_cose.append(o.cose_key(True, serialize=True))
 
     @staticmethod
     def _generate_hits() -> list[Orchid]:
