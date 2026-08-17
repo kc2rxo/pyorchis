@@ -72,10 +72,9 @@ class Orchid:
             bytes
         """
         return dump_cose_key(
-            self.key,
+            self.key if private_key else self.public_key,
             bytes.fromhex('D83650') + self.ip.packed, # set Key ID to Tag 54 w/IP6 = 0xD83650
             rsa_alg,
-            private_key,
             serialize
         )
 
@@ -97,15 +96,15 @@ class Orchid:
             str
         """
         return dump_jwk(
-            self.key,
+            self.key if private_key else self.public_key,
             self.ip.compressed,
             rsa_alg,
-            private_key,
             serialize
         )
 
     def dump(
             self,
+            private_key: bool = False,
             fmt: OrchisFormats = 'PEM',
             password: bytes | None = None
     ) -> bytes | str:
@@ -119,7 +118,7 @@ class Orchid:
         Returns:
             PEM data as bytes
         """
-        return dump_key(self.key, fmt, password)
+        return dump_key(self.key if private_key else self.public_key, fmt, password)
 
     def check_integrity(self) -> bool:
         """
@@ -131,7 +130,7 @@ class Orchid:
         _prefix = Prefix.from_ip(self.ip)
         _info = bytes.fromhex('0' + self.ip.packed.hex()[7:14]) if _prefix == Prefix.DET else None
         return self.ip == construct_ip(
-            self.key,
+            self.key.public_key(),
             _prefix,
             _info,
             ContextId.RFC7401 if _prefix is Prefix.HIT else ContextId.RFC9374

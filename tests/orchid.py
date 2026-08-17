@@ -46,6 +46,7 @@ class MyTestCase(unittest.TestCase):
     def _export_pem(self):
         for o in self.hits + self.dets:
             self.exported_pem.append(o.dump())
+            self.exported_pem.append(o.dump(True))
 
     @staticmethod
     def _generate_hits() -> list[Orchid]:

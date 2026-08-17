@@ -81,7 +81,7 @@ def load_key(data: bytes | str, password: str | bytes | None = None) -> OrchisKe
     raise ValueError('key failed to load')
 
 
-def dump_jwk(key: OrchisKey, key_id: str, alg: OrchisRsaAlgorithms, private: bool = False, serialize: bool = False) -> str | dict[str, Any]:
+def dump_jwk(key: OrchisKey, key_id: str, alg: OrchisRsaAlgorithms, serialize: bool = False) -> str | dict[str, Any]:
     if isinstance(key, DSA.DsaKey): raise ValueError('DSA not supported for COSE Key')
     _params = {'kid': key_id}
     return json.dumps(_to_params(_params, key, alg)) if serialize else _params
@@ -93,7 +93,7 @@ def load_jwk(data: str) -> tuple[OrchisKey, str]:
     return _from_params(_jwk), _jwk.get('kid', '')
 
 
-def dump_cose_key(key: OrchisKey, key_id: bytes, alg: OrchisRsaAlgorithms, private: bool = False, serialize: bool = False) -> bytes | dict[int, Any]:
+def dump_cose_key(key: OrchisKey, key_id: bytes, alg: OrchisRsaAlgorithms, serialize: bool = False) -> bytes | dict[int, Any]:
     if isinstance(key, DSA.DsaKey): raise ValueError('DSA not supported for COSE Key')
     _params: dict[int, Any] = {2: key_id}
     return cbor2.dumps(_to_params(_params, key, alg)) if serialize else _params
@@ -103,7 +103,6 @@ def load_cose_key(data: bytes) -> tuple[OrchisKey, bytes]:
     _key = cbor2.loads(data)
     if not isinstance(_key, dict): raise TypeError('improper COSE Key format')
     return _from_params(_key), _key.get(2, bytes())
-
 
 
 def suite_id_from_public_key_alg(public: OrchisKey) -> SuiteId:
@@ -123,7 +122,6 @@ def suite_id_from_public_key_alg(public: OrchisKey) -> SuiteId:
     elif isinstance(public, ECC.EccKey) and public.curve in ('Ed25519', 'Ed448'):
         return SuiteId.EDDSA_CSHAKE128
     raise TypeError('Public key algorithm not supported')
-
 
 
 def construct_host_identity(key: OrchisKey) -> bytes:
@@ -347,10 +345,6 @@ def _from_params(params: dict[int, Any] | dict[str, Any]) -> OrchisKey:
     elif _kty == 'OKP' or _kty == 1: return _ecc_from_params(params, is_jwk)
     else:
         raise TypeError('key algorithm not supported')
-
-
-def _kid_from_params(params: dict, is_jwk: bool) -> bytes | str:
-    return params.get('kid' if is_jwk else 2, '' if is_jwk else bytes())
 
 
 def _rsa_from_params(params: dict, is_jwk: bool) -> OrchisKey:
