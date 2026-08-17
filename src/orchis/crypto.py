@@ -17,7 +17,7 @@ OrchisKey = DSA.DsaKey | RSA.RsaKey | ECC.EccKey
 OrchisKeySize = Literal[2048, 3072]
 OrchisKeyCurve = Literal['P-256', 'P-384', 'Ed25519', 'Ed448']
 OrchisRsaAlgorithms = Literal['PS256', 'PS384', 'PS512']
-OrchisFormats = Literal['PEM', 'DER', 'OpenSSH', 'raw', 'JWK', 'COSEKey']
+OrchisFormats = Literal['PEM', 'DER', 'OpenSSH', 'raw']
 
 
 def generate(
