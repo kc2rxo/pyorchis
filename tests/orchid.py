@@ -1,8 +1,8 @@
 import unittest
 from typing import get_args
 
+from orchis.crypto import OrchisKeySize, OrchisKeyCurve
 from src.orchis.constant import SuiteId
-from src.orchis.crypto import OrchisRsaKeySizes, OrchisEcdsaCurves, OrchisEddsaCurves
 from src.orchis.orchid import Orchid
 
 
@@ -45,32 +45,22 @@ class MyTestCase(unittest.TestCase):
 
     def _export_pem(self):
         for o in self.hits + self.dets:
-            self.exported_cose.append(o.pem())
-            self.exported_cose.append(o.pem(True))
+            self.exported_pem.append(o.dump())
 
     @staticmethod
     def _generate_hits() -> list[Orchid]:
         # 2001:002X::
-        rsa = [
-            Orchid.host_identity_tag(SuiteId.RSA_DSA_SHA256, rsa_key_size=size) for size in get_args(OrchisRsaKeySizes)
-        ]
-        ecdsa = [
-            Orchid.host_identity_tag(SuiteId.ECDSA_SHA384, ecdsa_curve=curve) for curve in get_args(OrchisEcdsaCurves)
-        ]
-        eddsa = [
-            Orchid.host_identity_tag(SuiteId.EDDSA_CSHAKE128, eddsa_curve=curve) for curve in get_args(OrchisEddsaCurves)
-        ]
+        rsa = [Orchid.host_identity_tag('RSA', rsa=size) for size in get_args(OrchisKeySize)]
+        ecdsa = [Orchid.host_identity_tag('ECDSA', curve=curve) for curve in ('P-256', 'P-384')]
+        eddsa = [Orchid.host_identity_tag('EdDSA', curve=curve) for curve in ('Ed25519', 'Ed448')]
         return rsa + ecdsa + eddsa
 
     @staticmethod
     def _generate_dets() -> list[Orchid]:
         # 2001:0030:0280:0A:XX::
-        rsa = [
-            Orchid.drip_entity_tag(10, 10, SuiteId.RSA_DSA_SHA256, rsa_key_size=size) for size in get_args(OrchisRsaKeySizes)]
-        ecdsa = [
-            Orchid.drip_entity_tag(10, 10, SuiteId.ECDSA_SHA384, ecdsa_curve=curve) for curve in get_args(OrchisEcdsaCurves)]
-        eddsa = [
-            Orchid.drip_entity_tag(10, 10, SuiteId.EDDSA_CSHAKE128, eddsa_curve=curve) for curve in get_args(OrchisEddsaCurves)]
+        rsa = [Orchid.drip_entity_tag(10, 10, 'RSA', rsa=size) for size in get_args(OrchisKeySize)]
+        ecdsa = [Orchid.drip_entity_tag(10, 10, 'ECDSA', curve=curve) for curve in ('P-256', 'P-384')]
+        eddsa = [Orchid.drip_entity_tag(10, 10, 'EdDSA', curve=curve) for curve in ('Ed25519', 'Ed448')]
         return rsa + ecdsa + eddsa
 
 

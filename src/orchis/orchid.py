@@ -1,22 +1,10 @@
 from ipaddress import IPv6Address
 from typing import Self, Any
 
-
-from orchis.crypto import key_to_cose_key, key_to_jwk, jwk_to_key
+from orchis.crypto import dump_cose_key, dump_jwk, dump_key, OrchisFormats, construct_ip, OrchisKeyCurve, OrchisKeySize, \
+    generate, OrchisAlgorithm, load_cose_key, load_key_id, load_jwk, load_key
 from src.orchis.constant import SuiteId, ContextId, Prefix
-from src.orchis.crypto import (
-    OrchisPrivateKeyAlgorithms,
-    OrchisPublicKeyAlgorithms,
-    OrchisRsaKeySizes,
-    OrchisRsaAlgorithms,
-    OrchisEcdsaCurves,
-    OrchisEddsaCurves,
-    generate_key_pair,
-    construct_host_identity,
-    suite_id_from_public_key_alg,
-    construct_ip,
-    load_pem_key, dump_pem_key, load_key_id, cose_key_to_key
-)
+from src.orchis.crypto import OrchisKey, construct_host_identity, suite_id_from_public_key_alg, OrchisRsaAlgorithms
 
 
 class Orchid:
@@ -31,21 +19,20 @@ class Orchid:
         d: An optional private key
         ip: An IPv6 address instance loaded with an ORCHID
     """
-    x: OrchisPublicKeyAlgorithms
-    d: OrchisPrivateKeyAlgorithms | None
+    key: OrchisKey
     ip: IPv6Address
 
     @property
-    def public_key(self) -> OrchisPublicKeyAlgorithms:
-        return self.x
+    def public_key(self) -> OrchisKey:
+        return self.key.public_key()
 
     @property
     def has_private(self) -> bool:
-        return self.d is not None
+        return self.key.has_private()
 
     @property
-    def private_key(self) -> OrchisPrivateKeyAlgorithms | None:
-        return self.d
+    def private_key(self) -> OrchisKey | None:
+        return self.key if self.has_private else None
 
     @property
     def host_identity(self) -> bytes:
@@ -84,10 +71,11 @@ class Orchid:
         Returns:
             bytes
         """
-        return key_to_cose_key(
-            self.d if private_key and self.has_private else self.x,
+        return dump_cose_key(
+            self.key,
             bytes.fromhex('D83650') + self.ip.packed, # set Key ID to Tag 54 w/IP6 = 0xD83650
             rsa_alg,
+            private_key,
             serialize
         )
 
@@ -108,29 +96,30 @@ class Orchid:
         Returns:
             str
         """
-        return key_to_jwk(
-            self.d if private_key and self.has_private else self.x,
+        return dump_jwk(
+            self.key,
             self.ip.compressed,
             rsa_alg,
+            private_key,
             serialize
         )
 
-    def pem(
+    def dump(
             self,
-            private_key: bool = False,
+            fmt: OrchisFormats = 'PEM',
             password: bytes | None = None
-    ) -> bytes:
+    ) -> bytes | str:
         """
         Exports Orchid instance as PEM data.
 
         Args:
-            private_key: flag for private key
+            fmt:
             password: optional password in bytes for encryption
 
         Returns:
             PEM data as bytes
         """
-        return dump_pem_key(self.d if private_key else self.x, password)
+        return dump_key(self.key, fmt, password)
 
     def check_integrity(self) -> bool:
         """
@@ -142,7 +131,7 @@ class Orchid:
         _prefix = Prefix.from_ip(self.ip)
         _info = bytes.fromhex('0' + self.ip.packed.hex()[7:14]) if _prefix == Prefix.DET else None
         return self.ip == construct_ip(
-            self.x,
+            self.key,
             _prefix,
             _info,
             ContextId.RFC7401 if _prefix is Prefix.HIT else ContextId.RFC9374
@@ -151,26 +140,24 @@ class Orchid:
     @classmethod
     def host_identity_tag(
             cls,
-            hit_suite_id: SuiteId,
-            rsa_key_size: OrchisRsaKeySizes = 2048,
-            ecdsa_curve: OrchisEcdsaCurves = 'P-256',
-            eddsa_curve: OrchisEddsaCurves = 'Ed25519',
+            alg: OrchisAlgorithm,
+            dsa: OrchisKeySize = 2048,
+            rsa: OrchisKeySize = 2048,
+            curve: OrchisKeyCurve = 'Ed25519'
     ) -> Self:
         """
         Generates a Host Identity Tag (HIT) per RFC7401.
 
         Args:
             hit_suite_id: selection of [HIT] Suite ID
-            rsa_key_size: preferred RSA key size (2048, 4069, 8192), default=2048
-            ecdsa_curve: preferred ECDSA curve (NIST P-256, NIST P-384), default=P-256
-            eddsa_curve: preferred EdDSA curve (Ed25519, Ed448), default=Ed25519
+
 
         Returns:
             Instance of Orchid with HIT
         """
         _orchid = cls()
-        _orchid.x, _orchid.d = generate_key_pair(hit_suite_id, rsa_key_size, ecdsa_curve, eddsa_curve)
-        _orchid.ip = construct_ip(_orchid.x, Prefix.HIT)
+        _orchid.key = generate(alg, rsa, dsa, curve)
+        _orchid.ip = construct_ip(_orchid.key.public_key(), Prefix.HIT)
         return _orchid
 
     @classmethod
@@ -178,10 +165,10 @@ class Orchid:
             cls,
             raa: int,
             hda: int,
-            hhit_suite_id: SuiteId,
-            rsa_key_size: OrchisRsaKeySizes = 2048,
-            ecdsa_curve: OrchisEcdsaCurves = 'P-256',
-            eddsa_curve: OrchisEddsaCurves = 'Ed25519'
+            alg: OrchisAlgorithm,
+            dsa: OrchisKeySize = 2048,
+            rsa: OrchisKeySize = 2048,
+            curve: OrchisKeyCurve = 'Ed25519'
     ) -> Self:
         """
         Generates a DRIP Entity Tag (DRIP) per RFC9374.
@@ -189,17 +176,18 @@ class Orchid:
         Args:
             raa: value for Registered Assigning Authority of HID
             hda: value for HHIT Domain Authority if HID
-            hhit_suite_id: selection of [HHIT] Suite ID
-            rsa_key_size: preferred RSA key size (2048, 4069, 8192), default=2048
-            ecdsa_curve: preferred ECDSA curve (NIST P-256, NIST P-384), default=P-256
-            eddsa_curve: preferred EdDSA curve (Ed25519, Ed448), default=Ed25519
 
         Returns:
             Instance of Orchid with DET
         """
         _orchid = cls()
-        _orchid.x, _orchid.d = generate_key_pair(hhit_suite_id, rsa_key_size, ecdsa_curve, eddsa_curve)
-        _orchid.ip = construct_ip(_orchid.x, Prefix.DET, (raa << 14 | hda).to_bytes(4), ContextId.RFC9374)
+        _orchid.key = generate(alg, rsa, dsa, curve)
+        _orchid.ip = construct_ip(
+            _orchid.key.public_key(),
+            Prefix.DET,
+            (raa << 14 | hda).to_bytes(4),
+            ContextId.RFC9374
+        )
         return _orchid
 
     @classmethod
@@ -221,8 +209,8 @@ class Orchid:
             Instance of Orchid with COSE Key.
         """
         _orchid = cls()
-        _orchid.x, _orchid.d, _kid = cose_key_to_key(cose_key)
-        _orchid.ip = load_key_id(_kid, _orchid.x, prefix, info)
+        _orchid.key, _kid = load_cose_key(cose_key)
+        _orchid.ip = load_key_id(_kid, _orchid.key.public_key(), prefix, info)
         return _orchid
 
     @classmethod
@@ -245,8 +233,8 @@ class Orchid:
             Instance of Orchid loaded through JWK
         """
         _orchid = cls()
-        _orchid.x, _orchid.d, _kid = jwk_to_key(jwk)
-        _orchid.ip = load_key_id(_kid, _orchid.x, prefix, info)
+        _orchid.key, _kid = load_jwk(jwk)
+        _orchid.ip = load_key_id(_kid, _orchid.key.public_key(), prefix, info)
         return _orchid
 
     @classmethod
@@ -272,8 +260,8 @@ class Orchid:
             Instance of Orchid loaded through PEM data
         """
         _orchid = cls()
-        _orchid.x, _orchid.d = load_pem_key(pem_data, password)
-        _orchid.ip = load_key_id(kid, _orchid.x, prefix, info)
+        _orchid.key = load_key(pem_data, password)
+        _orchid.ip = load_key_id(kid, _orchid.key.public_key(), prefix, info)
         return _orchid
 
     def __str__(self) -> str:
