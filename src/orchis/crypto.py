@@ -54,7 +54,7 @@ def dump_key(key: OrchisKey, fmt: OrchisFormats, password: str | bytes | None = 
     elif isinstance(key, ECC.EccKey):
         if key.curve not in ('NIST P-256', 'NIST P-384', 'Ed25519', 'Ed448'):
             raise ValueError('ECC dump curves: P-256, P-384, Ed25519, Ed448')
-        if fmt not in ('PEM', 'OpenSSH') and fmt not in ('DER', 'raw'):
+        if not (fmt in ('PEM', 'OpenSSH') or fmt in ('DER', 'raw')):
             raise ValueError('ECC dump formats: PEM, DER, OpenSSH, raw')
         if password: return key.export_key(format=fmt, passphrase=password)
         else: return key.export_key(format=fmt)
@@ -71,13 +71,12 @@ def load_key(data: bytes | str, password: str | bytes | None = None) -> OrchisKe
             elif key_type == 'RSA':
                 if isinstance(password, bytes): password = password.decode('utf-8')
                 return RSA.import_key(data, password)
-            elif key_type == 'ECC':
+            elif key_type == 'ECDSA' or key_type == 'EdDSA':
                 if isinstance(password, bytes): password = password.decode('utf-8')
-                return ECC.import_key(data, password)
+                return ECC.import_key(data)
             else:
                 raise ValueError(f'failed to load {key_type}')
-        except ValueError as e:
-            print(e)
+        except ValueError:
             continue
     raise ValueError('key failed to load')
 
@@ -91,7 +90,7 @@ def dump_jwk(key: OrchisKey, key_id: str, alg: OrchisRsaAlgorithms, private: boo
 def load_jwk(data: str) -> tuple[OrchisKey, str]:
     _jwk = json.loads(data)
     if not isinstance(_jwk, dict): raise TypeError('improper JWK format')
-    return _from_params(_jwk) + (_jwk.get('kid', ''),)
+    return _from_params(_jwk), _jwk.get('kid', '')
 
 
 def dump_cose_key(key: OrchisKey, key_id: bytes, alg: OrchisRsaAlgorithms, private: bool = False, serialize: bool = False) -> bytes | dict[int, Any]:
@@ -300,18 +299,20 @@ def _ecc_to_params(
         params: dict,
         is_jwk: bool
 ) -> dict[str, Any] | dict[int, Any]:
-    if key.curve in ('P-256', 'P-384'):
+    if key.curve in ('NIST P-256', 'NIST P-384'):
         params.update({'kty' if is_jwk else 1 : 'EC' if is_jwk else 2})
         _crv = ('P-256' if is_jwk else 1) if key.curve == 'NIST P-256' else ('P-384' if is_jwk else 2)
         params.update({'crv' if is_jwk else -1: _crv})
         _size = key.pointQ.size_in_bits()
-        _x = _int_to_bytes(key.pointQ.x, True, _size) if is_jwk else _int_to_bytes(key.pointQ.x)
-        _y = _int_to_bytes(key.pointQ.y, True, _size) if is_jwk else _int_to_bytes(key.pointQ.y)
+        _x, _y = int(key.pointQ.x), int(key.pointQ.y)
+        _x = _int_to_bytes(_x, True, _size) if is_jwk else _int_to_bytes(_x, bit_size=_size)
+        _y = _int_to_bytes(_y, True, _size) if is_jwk else _int_to_bytes(_y, bit_size=_size)
         if key.has_private():
+            _d = int(key.d)
             params.update({
                 'x' if is_jwk else -2 : _x,
                 'y' if is_jwk else -3 : _y,
-                'd' if is_jwk else -4 : _int_to_bytes(key.d, True, _size) if is_jwk else _int_to_bytes(key.d),
+                'd' if is_jwk else -4 : _int_to_bytes(_d, True, _size) if is_jwk else _int_to_bytes(_d, bit_size=_size),
             })
         else:
             params.update({
@@ -340,9 +341,10 @@ def _ecc_to_params(
 def _from_params(params: dict[int, Any] | dict[str, Any]) -> OrchisKey:
     is_jwk = all(isinstance(k, str) for k, _ in params.items())
     params: dict[str | int, Any]
-    if params['kty' if is_jwk else 1] == 'RSA' if is_jwk else 3: return _rsa_from_params(params, is_jwk)
-    elif params['kty' if is_jwk else 1] == 'EC' if is_jwk else 2: return _ecc_from_params(params, is_jwk)
-    elif params['kty' if is_jwk else 1] == 'OKP' if is_jwk else 1: return _ecc_from_params(params, is_jwk)
+    _kty = params['kty' if is_jwk else 1]
+    if _kty == 'RSA' or _kty == 3: return _rsa_from_params(params, is_jwk)
+    elif _kty == 'EC' or _kty == 2: return _ecc_from_params(params, is_jwk)
+    elif _kty == 'OKP' or _kty == 1: return _ecc_from_params(params, is_jwk)
     else:
         raise TypeError('key algorithm not supported')
 
@@ -352,20 +354,21 @@ def _kid_from_params(params: dict, is_jwk: bool) -> bytes | str:
 
 
 def _rsa_from_params(params: dict, is_jwk: bool) -> OrchisKey:
-    _n = int(hexlify(_base64url_decode(params['n' if is_jwk else -1])), 16)
-    _e = int(hexlify(_base64url_decode(params['e' if is_jwk else -2])), 16)
+    _n = int(hexlify(_base64url_decode(params['n'])), 16) if is_jwk else int.from_bytes(params[-1])
+    _e = int(hexlify(_base64url_decode(params['e'])), 16) if is_jwk else int.from_bytes(params[-2])
     if  ('d' not in params) or (-3 not in params):
         key = RSA.construct((_n, _e))
     else:
-        _d = int(hexlify(_base64url_decode(params['d' if is_jwk else -3])), 16)
+        _d = int(hexlify(_base64url_decode(params['d'])), 16) if is_jwk else int.from_bytes(params[-3])
         key = RSA.construct((_n, _e, _d))
     return key
 
 
 def _ecc_from_params(params: dict, is_jwk: bool) -> OrchisKey:
+    _kty = params['kty' if is_jwk else 1]
     _crv = params['crv' if is_jwk else -1]
     _x = params['x' if is_jwk else -2]
-    if _crv in (1, 2) or _crv in ('P-256', 'P-384'):
+    if _crv in (1, 2, 'P-256', 'P-384') and _kty in ('EC', 2):
         _x = int(hexlify(_base64url_decode(_x)), 16) if is_jwk else int.from_bytes(_x)
         if _crv in (1, 2): _crv = 'P-256' if _crv == 1 else 'P-384'
         _y = params['y' if is_jwk else -3]
@@ -376,11 +379,11 @@ def _ecc_from_params(params: dict, is_jwk: bool) -> OrchisKey:
             _d = params['d' if is_jwk else -4]
             _d = int(hexlify(_base64url_decode(_d)), 16) if is_jwk else int.from_bytes(_d)
             key = ECC.construct(curve=_crv, d=_d)
-    elif _crv in (6, 7) or _crv in ('Ed25519', 'Ed448'):
+    elif _crv in (6, 7, 'Ed25519', 'Ed448') and _kty in ('OKP', 1):
         if ('d' not in params) or (-4 not in params):
-            key = eddsa.import_public_key(_base64url_decode(_x))
+            key = eddsa.import_public_key(_base64url_decode(_x) if is_jwk else _x)
         else:
-            key = eddsa.import_private_key(_base64url_decode(params['d' if is_jwk else -4]))
+            key = eddsa.import_private_key(_base64url_decode(params['d']) if is_jwk else params[-4])
     else:
         raise TypeError('ecc curve not supported')
     return key
