@@ -8,10 +8,8 @@ version = "2026.8.0a.0"
 description = "General-Use ORCHIDs for Modern Applications & Protocols."
 requires-python = ">=3.13"
 dependencies = [
-    "cryptography>=50.0.0",
+    "cbor2>=6.1.4",
     "pycryptodome>3.23.0",
-    "jwcrypto>=1.5.8",
-    "cwt>=3.3.0",
 ]
 authors = [
     { name = "Adam Wiethuechter", email = "adam.wiethuechter@gmail.com" }
