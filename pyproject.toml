@@ -33,3 +33,6 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/kc2rxo/orchis.git"
+
+[project.optional-dependencies]
+x509 = ["cryptography>=50.0.0"]

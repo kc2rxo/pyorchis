@@ -69,4 +69,12 @@ RFC7401](https://datatracker.ietf.org/doc/html/rfc7401#section-5.2.9).
 ## DRIP Support Capabilities
 
 `Orchid.arpa()` returns the reverse lookup (i.e. nibble-reversed) IPv6 Fully Qualified Domain Name (FQDN) that is 
-used by DRIP to enable the lookups via [RFC9886](https://datatracker.ietf.org/doc/html/rfc9886).
+used by DRIP to enable lookups via [RFC9886](https://datatracker.ietf.org/doc/html/rfc9886).
+
+`x509` is a module for X.509 CertificateSigningRequests & Certificates to be generated, dumped and loaded that 
+follows the principals of [DRIP Key Infrastructure (DKI)](https://datatracker.ietf.org/doc/draft-ietf-drip-dki/).
+Importantly it is the use of Subject Alternative Name: IP6 for holding the Subject ORCHID and the 
+Authority Key Identifier for the Issuer ORCHID. These certificates are used as part of RFC9886 and are the 
+"Canonical Registration Certificate" that are issued by levels of the hierarchy.
+
+These X.509 features can be included using the 
