@@ -18,40 +18,42 @@ The main protocols using ORCHIDs, with dedicated IPv6 prefixes, are the Host Ide
 (DRIP, RFC9374, `2001:30::/28`) with the DRIP Entity Tag (DET). More on ORCHIDs in general can be found in RFC7343
 and its predecessor RFC4843.
 
-This project is designed as a cross-platform (and in the future cross-language) reference implementation for
-ORCHIDs. It is not intended to be a complete solution but more of a starting point and general toolbox for 
-using of ORCHIDs as part of modern applications and protocols.
+This project is designed as a reference implementation for ORCHIDs and provides a simple interface, generate and import 
+them in modern applications or protocols. It is not intended to be a complete solution but rather a general
+toolbox for using of ORCHIDs.
 
 > The project is named after the plant family and genus that [orchids](https://en.wikipedia.org/wiki/Orchid) are from.
 
-## Package Features
+## HIP Support Matrix
 
-This package supports a majority of cryptographic key algorithms that are shared between the HIT Suite ID (RFC7401) and 
-HHIT Suite ID (RFC9374) families. DSA and is excluded in favor of ECDSA. ECDSA_LOW is not supported due to 
-the underlying library missing its curve (SECP160R1).
+| [H]HIT Suite ID | HI Algorithm | Key Algorithm | Curve      | Hash Algorithm | Supported          | Reference |
+|-----------------|--------------|---------------|------------|----------------|--------------------|-----------|
+| 1               | 3            | DSA           | -          | SHA-256        | :white_check_mark: | RFC7401   |
+| 1               | 5            | RSA           | -          | SHA-256        | :white_check_mark: | RFC7401   |
+| 2               | 7            | ECDSA         | NIST P-256 | SHA-384        | :white_check_mark: | RFC7401   |
+| 2               | 7            | ECDSA         | NIST P-384 | SHA-384        | :white_check_mark: | RFC7401   |
+| 3               | 9            | ECDSA_LOW     | SECP160R1  | SHA-1          | :x:                | RFC7401   |
+| 5               | 13           | EdDSA         | Ed25519    | cSHAKE128      | :white_check_mark: | RFC9374   |
+| 5               | 13           | EdDSA         | Ed25519ph  | cSHAKE128      | :x:                | RFC9374   |
+| 5               | 13           | EdDSA         | Ed448      | cSHAKE128      | :white_check_mark: | RFC9374   |
+| 5               | 13           | EdDSA         | Ed448ph    | cSHAKE128      | :x:                | RFC9374   |
 
-| Key Algorithm       | Key Sizes or Curves    | Underlying Package |
-|---------------------|------------------------|--------------------|
-| RS256, RS384, RS512 | 2048, 4096, 8192       | `cryptography`     |
-| ECDSA               | NIST P-256, NIST P-384 | `cryptography`     |
-| EdDSA               | Ed25519, Ed448         | `cryptography`     |
+Both RFC7401 prefix of `2001:20::/28` and RFC9374 prefix of `2001:30::/28` are supported.
 
-> Note: Encryption operations are not supported under ORCHID as the cryptographic agility does not include any 
-encryption key algorithms
+## Import/Export Matrix
 
-The following structures can be obtained through the ORCHID package APIs:
+| Key Algorithm | Curve      | PEM/DER/OpenSSH    | Raw                | JSON Web Key       | COSE Key           |
+|---------------|------------|--------------------|--------------------|--------------------|--------------------|
+| DSA           | -          | :white_check_mark: | :x:                | :white_check_mark: | :white_check_mark: |
+| RSA           | -          | :white_check_mark: | :x:                | :white_check_mark: | :white_check_mark: |
+| ECDSA         | NIST P-256 | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| ECDSA         | NIST P-384 | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| EdDSA         | Ed25519    | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| ECDSA         | Ed448      | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 
-| Structure                         | API                | Underlying Package | Reference            |
-|-----------------------------------|--------------------|--------------------|----------------------|
-| COSE_Key                          | `Orchid`           | `cwt`              | RFC9052, Section 7   |
-| JWK                               | `Orchid`           | `jwcrypto`         | RFC7517              |
-| IPv6 Address                      | `Orchid`           | -                  | -                    |
-| COSE_Sign1                        | `ObjectSigning`    | `cwt`              | RFC9052, Section 4   |
-| COSE_Sign                         | `ObjectSigning`    | `cwt`              | RFC9052, Section 4   |
-| JWS                               | `ObjectSigning`    | `jwcrypto`         | RFC7515              |
-| X.509 Certificate Signing Request | `x509.csr`         | `cryptography`     | -                    |
-| X.509 Certificate                 | `x509.certificate` | `cryptography`     | -                    |
-| DRIP Endorsement                  | `Drip`             | -                  | RFC9575, Section 4.1 |
+JWKs and COSE Keys are imported using their native encoded typing (`str`/`bytes`) and can be exported either
+encoded or in `dict[int, Any]` for COSE Key and `dict[str, Any]` for JWK.
 
-All of these support ORCHIDs through their key algorithms for signing but also identify the public keys using ORCHIDs
-in respective fields for key identification (COSE/JOSE with `key id (kid)`, X.509 with `Subject Alternative Name: IP6`).
+When exported as COSE Key/JWK a Key ID is set using the ORCHID of the key. When imported with a Key ID an attempt is
+made to convert it to an ORCHID or use the imported key to generate the ORCHID and set the `Orchid.ip`
+attribute. A raw key import generates the ORCHID directly from incoming key material.
