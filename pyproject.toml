@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pyorchis"
 version = "2026.8.0a.0"
-description = "General-Use ORCHIDs for Modern Applications & Protocols."
+description = "ORCHIDs for Internet Applications & Protocols."
 requires-python = ">=3.13"
 dependencies = [
     "cbor2>=6.1.4",
@@ -18,7 +18,7 @@ readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["COPYING.txt"]
 keywords = [
-    "orchid", "cose", "cose-sign", "cose-sign1", "jose", "jwk", "jws", "hip", "drip", "rfc7401", "rfc9374", "rfc7343"
+    "orchid", "cose", "jose", "hip", "drip", "rfc7401", "rfc9374", "rfc7343"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -36,3 +36,8 @@ Repository = "https://github.com/kc2rxo/orchis.git"
 
 [project.optional-dependencies]
 x509 = ["cryptography>=50.0.0"]
+all = [
+    "cbor2>=6.1.4",
+    "pycryptodome>3.23.0",
+    "cryptography>=50.0.0"
+]
