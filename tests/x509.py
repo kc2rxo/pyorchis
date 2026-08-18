@@ -3,14 +3,14 @@ from datetime import datetime, UTC, timedelta
 
 try:
     from cryptography.x509 import Name
+    from src.orchis.x509 import csr, load_der_x509, load_pem_x509, certificate
 except ImportError:
     raise ImportError('cryptography module not installed to run tests')
 
-from orchis.orchid import Orchid
-from orchis.x509 import csr, load_der_x509, load_pem_x509, certificate
+from src.orchis.orchid import Orchid
 
 
-class MyTestCase(unittest.TestCase):
+class X509Test(unittest.TestCase):
     def setUp(self) -> None:
         self.issuer: Orchid = Orchid.host_identity_tag('EdDSA', curve='Ed25519')
         self.subject: Orchid = Orchid.host_identity_tag('EdDSA', curve='Ed25519')

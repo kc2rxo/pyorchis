@@ -74,11 +74,9 @@ used by DRIP to enable lookups via [RFC9886](https://datatracker.ietf.org/doc/ht
 ---
 
 `x509` is a module (installed with `pyorchis[x509]`) for X.509 CertificateSigningRequests & Certificates to be 
-generated, dumped and loaded that follows the principals of 
+generated, dumped and loaded that follows the principals of the
 [DRIP Key Infrastructure (DKI)](https://datatracker.ietf.org/doc/draft-ietf-drip-dki/).
 
 It enforces the use of `Subject Alternative Name: IP6` for holding the Subject ORCHID and the extensions of
 `Authority Key Identifier` for the Issuer ORCHID. These certificates are the "Canonical Registration Certificate" 
 that are issued by levels of the hierarchy in DRIP and stored in the HHIT RRType of DNS.
-
----

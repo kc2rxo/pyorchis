@@ -5,7 +5,7 @@ from orchis.crypto import OrchisKeySize
 from src.orchis.orchid import Orchid
 
 
-class MyTestCase(unittest.TestCase):
+class OrchidTest(unittest.TestCase):
     def setUp(self) -> None:
         self.hits = self._generate_hits()
         self.dets = self._generate_dets()
