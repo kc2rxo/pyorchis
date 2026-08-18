@@ -1,8 +1,7 @@
 import unittest
 from typing import get_args
 
-from orchis.crypto import OrchisKeySize, OrchisKeyCurve
-from src.orchis.constant import SuiteId
+from orchis.crypto import OrchisKeySize
 from src.orchis.orchid import Orchid
 
 
