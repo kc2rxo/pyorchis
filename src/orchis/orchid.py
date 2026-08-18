@@ -1,10 +1,10 @@
 from ipaddress import IPv6Address
 from typing import Self, Any
 
-from orchis.crypto import dump_cose_key, dump_jwk, dump_key, OrchisFormat, construct_ip, OrchisKeyCurve, \
+from orchis.crypto import dump_cose_key, dump_jwk, dump_key, OrchisFormat, construct_ip6, OrchisKeyCurve, \
     OrchisKeySize, generate, OrchisKeyAlgorithm, load_cose_key, load_key_id, load_jwk, load_key
 from src.orchis.constant import SuiteId, ContextId, Prefix
-from src.orchis.crypto import OrchisKey, construct_host_identity, suite_id_from_public_key_alg, OrchisAlgorithm
+from src.orchis.crypto import OrchisKey, construct_host_identity, suite_id_from_key, OrchisAlgorithm
 
 
 class Orchid:
@@ -52,7 +52,7 @@ class Orchid:
 
     @property
     def suite_id(self) -> SuiteId:
-        return suite_id_from_public_key_alg(self.public_key)
+        return suite_id_from_key(self.public_key)
 
     def cose_key(
             self,
@@ -130,7 +130,7 @@ class Orchid:
         """
         _prefix = Prefix.from_ip(self.ip)
         _info = bytes.fromhex('0' + self.ip.packed.hex()[7:14]) if _prefix == Prefix.DET else None
-        return self.ip == construct_ip(
+        return self.ip == construct_ip6(
             self.key.public_key(),
             _prefix,
             _info,
@@ -159,7 +159,7 @@ class Orchid:
         """
         _orchid = cls()
         _orchid.key = generate(alg, rsa, dsa, curve)
-        _orchid.ip = construct_ip(_orchid.key.public_key(), Prefix.HIT)
+        _orchid.ip = construct_ip6(_orchid.key.public_key(), Prefix.HIT)
         return _orchid
 
 
@@ -189,7 +189,7 @@ class Orchid:
         """
         _orchid = cls()
         _orchid.key = generate(alg, rsa, dsa, curve)
-        _orchid.ip = construct_ip(
+        _orchid.ip = construct_ip6(
             _orchid.key.public_key(),
             Prefix.DET,
             (raa << 14 | hda).to_bytes(4),

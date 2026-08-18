@@ -133,7 +133,7 @@ def dump_jwk(
     Returns:
         JWK str or dict
     """
-    if isinstance(key, DSA.DsaKey): raise ValueError('DSA not supported for COSE Key')
+    if isinstance(key, DSA.DsaKey): raise ValueError('DSA not supported for JWK')
     _params = {'kid': key_id}
     return json.dumps(_to_params(_params, key, alg)) if serialize else _params
 
@@ -191,21 +191,21 @@ def load_cose_key(data: bytes) -> tuple[OrchisKey, bytes]:
     return _from_params(_key), _key.get(2, bytes())
 
 
-def suite_id_from_public_key_alg(public: OrchisKey) -> SuiteId:
+def suite_id_from_key(key: OrchisKey) -> SuiteId:
     """
-    Selects a SuiteID from public key algorithm
+    Selects a SuiteID from OrchisKey instance
 
     Args:
-        public: public key instance
+        key: OrchisKey instance
 
     Returns:
         SuiteId instance
     """
-    if isinstance(public, DSA.DsaKey) or isinstance(public, RSA.RsaKey):
+    if isinstance(key, DSA.DsaKey) or isinstance(key, RSA.RsaKey):
         return SuiteId.RSA_DSA_SHA256
-    elif isinstance(public, ECC.EccKey) and public.curve in ('NIST P-256', 'NIST P-384'):
+    elif isinstance(key, ECC.EccKey) and key.curve in ('NIST P-256', 'NIST P-384'):
         return SuiteId.ECDSA_SHA384
-    elif isinstance(public, ECC.EccKey) and public.curve in ('Ed25519', 'Ed448'):
+    elif isinstance(key, ECC.EccKey) and key.curve in ('Ed25519', 'Ed448'):
         return SuiteId.EDDSA_CSHAKE128
     raise TypeError('Public key algorithm not supported')
 
@@ -224,7 +224,7 @@ def construct_host_identity(key: OrchisKey) -> bytes:
         bytes of the Host Identity field of HOST_ID parameter
     """
     public = key.public_key() if key.has_private() else key
-    match suite_id_from_public_key_alg(public):
+    match suite_id_from_key(public):
         case SuiteId.RSA_DSA_SHA256:
             public: RSA.RsaKey
             _e_size = (public.e.bit_length() + 7) // 8
@@ -267,7 +267,7 @@ def load_key_id(
     try:
         return IPv6Address(kid)
     except ValueError:
-        return construct_ip(
+        return construct_ip6(
             public,
             prefix,
             info,
@@ -275,7 +275,7 @@ def load_key_id(
         )
 
 
-def construct_ip(
+def construct_ip6(
         public: OrchisKey,
         prefix: Prefix,
         info: bytes | None = None,
@@ -293,8 +293,8 @@ def construct_ip(
     Returns:
         An instance of IPv6Address containing constructed ORCHID
     """
-    _suite_id = suite_id_from_public_key_alg(public)
-    _prefix_info_oga = _construct_prefix_info_oga(prefix, SuiteId.RSA_DSA_SHA256, info)
+    _suite_id = suite_id_from_key(public)
+    _prefix_info_oga = _construct_ip6_network(prefix, SuiteId.RSA_DSA_SHA256, info)
     _hih_length = 16 - len(_prefix_info_oga)
     match _suite_id:
         case SuiteId.RSA_DSA_SHA256:
@@ -317,7 +317,7 @@ def construct_ip(
     return IPv6Address(_prefix_info_oga + _hih)
 
 
-def _construct_prefix_info_oga(prefix: Prefix, oga_id: SuiteId, info: bytes | None = None) -> bytes:
+def _construct_ip6_network(prefix: Prefix, oga_id: SuiteId, info: bytes | None = None) -> bytes:
     # info & oga_id length is determined by the prefix in use
     match prefix:
         case Prefix.HIT:
