@@ -17,9 +17,9 @@ The main protocols using ORCHIDs, with dedicated IPv6 prefixes, are the Host Ide
 the Host Identity Tag (HIT) generated through ORCHID and Drone Remote ID Protocol (DRIP, RFC9374) with the 
 DRIP Entity Tag (DET) as its ORCHID. More on ORCHIDs in general can be found in RFC7343 and its predecessor RFC4843.
 
-This project is designed as a reference implementation for ORCHIDs and provides a simple interface, generate and import 
-them in Internet based applications or protocols. It is not intended to be a complete solution but rather a general
-toolbox for using of ORCHIDs.
+This project is designed as a reference implementation for ORCHIDs and provides a simple interface to generate and 
+import them in Internet based applications or protocols. It is not intended to be a complete solution but rather a 
+general toolbox for using of ORCHIDs.
 
 > The project (pyorchis) is named after the plant family and genus that [orchids](https://en.wikipedia.org/wiki/Orchid) 
 > are from.
