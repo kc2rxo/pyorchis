@@ -1,4 +1,4 @@
-# orchis: ORCHIDs for Modern Applications & Protocols
+# ORCHIDs for Internet Applications & Protocols
 
 Overlay Routable Cryptographic Hash IDentifiers (ORCHIDs) are valid non-routable addresses that are found under 
 specific IANA assigned prefixes out of the IPv6 Special Purpose Address Space. They encode cryptographic
@@ -18,12 +18,13 @@ the Host Identity Tag (HIT) generated through ORCHID and Drone Remote ID Protoco
 DRIP Entity Tag (DET) as its ORCHID. More on ORCHIDs in general can be found in RFC7343 and its predecessor RFC4843.
 
 This project is designed as a reference implementation for ORCHIDs and provides a simple interface, generate and import 
-them in modern applications or protocols. It is not intended to be a complete solution but rather a general
+them in Internet based applications or protocols. It is not intended to be a complete solution but rather a general
 toolbox for using of ORCHIDs.
 
-> The project is named after the plant family and genus that [orchids](https://en.wikipedia.org/wiki/Orchid) are from.
+> The project (pyorchis) is named after the plant family and genus that [orchids](https://en.wikipedia.org/wiki/Orchid) 
+> are from.
 
-## Cryptography Support Matrix
+## Cryptography Matrix
 
 This project relies on `pycryptodome` to provide its cryptographic capabilities in support of ORCHID generation and
 utility functions for HIP and DRIP.
@@ -56,7 +57,7 @@ Both RFC7401 prefix of `2001:20::/28` and RFC9374 prefix of `2001:30::/28` are s
 JWKs and COSE Keys are imported using their native encoded typing (`str`/`bytes`) and can be exported either
 encoded or in `dict[int, Any]` for COSE Key and `dict[str, Any]` for JWK.
 
-When exported as COSE Key/JWK a Key ID is set using the ORCHID of the key. When imported with a Key ID an attempt is
+When exported as COSE Key/JWK, a Key ID is set using the ORCHID of the key. When imported with a Key ID an attempt is
 made to convert it to an ORCHID or use the imported key to generate the ORCHID and set the `Orchid.ip`
 attribute. A raw key import generates the ORCHID directly from incoming key material.
 
