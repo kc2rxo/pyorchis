@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/kc2rxo/orchis.git"
+Repository = "https://github.com/kc2rxo/pyorchis.git"
 
 [project.optional-dependencies]
 x509 = ["cryptography>=50.0.0"]
