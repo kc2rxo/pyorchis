@@ -1,2 +1,0 @@
-class Drip:
-    pass

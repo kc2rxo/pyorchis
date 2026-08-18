@@ -3,7 +3,7 @@ from datetime import datetime, UTC, timedelta
 
 try:
     from cryptography.x509 import Name
-    from src.orchis.x509 import csr, load_der_x509, load_pem_x509, certificate
+    from orchis.drip.x509 import csr, load_der_x509, load_pem_x509, certificate
 except ImportError:
     raise ImportError('cryptography module not installed to run tests')
 

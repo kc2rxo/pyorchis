@@ -35,7 +35,7 @@ classifiers = [
 Repository = "https://github.com/kc2rxo/pyorchis.git"
 
 [project.optional-dependencies]
-x509 = ["cryptography>=50.0.0"]
+drip = ["cryptography>=50.0.0"]
 all = [
     "cbor2>=6.1.4",
     "pycryptodome>3.23.0",
