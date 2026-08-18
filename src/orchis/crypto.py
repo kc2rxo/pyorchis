@@ -11,21 +11,32 @@ from Crypto.Signature import eddsa
 
 from src.orchis.constant import ContextId, Prefix, SuiteId
 
-
-OrchisAlgorithm = Literal['DSA', 'RSA', 'ECDSA', 'EdDSA']
+OrchisKeyAlgorithm = Literal['DSA', 'RSA', 'ECDSA', 'EdDSA']
 OrchisKey = DSA.DsaKey | RSA.RsaKey | ECC.EccKey
 OrchisKeySize = Literal[2048, 3072]
 OrchisKeyCurve = Literal['P-256', 'P-384', 'Ed25519', 'Ed448']
-OrchisRsaAlgorithms = Literal['PS256', 'PS384', 'PS512']
-OrchisFormats = Literal['PEM', 'DER', 'OpenSSH', 'raw']
+OrchisAlgorithm = Literal['PS256', 'PS384', 'PS512']
+OrchisFormat = Literal['PEM', 'DER', 'OpenSSH', 'raw']
 
 
 def generate(
-        alg: OrchisAlgorithm,
+        alg: OrchisKeyAlgorithm,
         dsa: OrchisKeySize = 2048,
         rsa: OrchisKeySize = 2048,
         curve: OrchisKeyCurve = 'Ed25519'
 ) -> OrchisKey:
+    """
+    Generates new key based on parameters.
+
+    Args:
+        alg: OrchisKeyAlgorithm instance
+        dsa: OrchisKeySize, default=2048
+        rsa: OrchisKeySize, default=2048
+        curve: OrchisKeyCurve, default='Ed25519'
+
+    Returns:
+        OrchisKey instance
+    """
     if alg == 'DSA':
         return DSA.generate(dsa)
     elif alg == 'RSA':
@@ -38,7 +49,18 @@ def generate(
         raise ValueError(f'{alg} {dsa}/{rsa}/{curve} not supported')
 
 
-def dump_key(key: OrchisKey, fmt: OrchisFormats, password: str | bytes | None = None) -> bytes | str:
+def dump_key(key: OrchisKey, fmt: OrchisFormat, password: str | bytes | None = None) -> bytes | str:
+    """
+    Dumps OrchisKey into encoded bytes or str.
+
+    Args:
+        key: OrchisKey
+        fmt: OrchisFormats instance
+        password: str or bytes, default=None
+
+    Returns:
+
+    """
     if isinstance(key, DSA.DsaKey):
         if fmt not in ('PEM', 'DER', 'OpenSSH'):
             raise ValueError('DSA dump formats: PEM, DER, OpenSSH')
@@ -56,14 +78,26 @@ def dump_key(key: OrchisKey, fmt: OrchisFormats, password: str | bytes | None = 
             raise ValueError('ECC dump curves: P-256, P-384, Ed25519, Ed448')
         if not (fmt in ('PEM', 'OpenSSH') or fmt in ('DER', 'raw')):
             raise ValueError('ECC dump formats: PEM, DER, OpenSSH, raw')
-        if password: return key.export_key(format=fmt, passphrase=password)
-        else: return key.export_key(format=fmt)
+        if password:
+            return key.export_key(format=fmt, passphrase=password)
+        else:
+            return key.export_key(format=fmt)
     else:
         raise ValueError('Key type not supported for dumping')
 
 
 def load_key(data: bytes | str, password: str | bytes | None = None) -> OrchisKey:
-    for key_type in get_args(OrchisAlgorithm):
+    """
+    Loads key bytes or str into OrchisKey
+
+    Args:
+        data: bytes or str data
+        password: str or bytes, default=None
+
+    Returns:
+        OrchisKey instance
+    """
+    for key_type in get_args(OrchisKeyAlgorithm):
         try:
             if key_type == 'DSA':
                 if isinstance(password, bytes): password = password.decode('utf-8')
@@ -81,25 +115,77 @@ def load_key(data: bytes | str, password: str | bytes | None = None) -> OrchisKe
     raise ValueError('key failed to load')
 
 
-def dump_jwk(key: OrchisKey, key_id: str, alg: OrchisRsaAlgorithms, serialize: bool = False) -> str | dict[str, Any]:
+def dump_jwk(
+        key: OrchisKey,
+        key_id: str,
+        alg: OrchisAlgorithm,
+        serialize: bool = False
+) -> str | dict[str, Any]:
+    """
+    Dumps an OrchisKey as JSON Web Key str or dict.
+
+    Args:
+        key: OrchisKey instance
+        key_id: Key ID to use, typically IPv6Address compressed
+        alg: OrchisAlgorithms instance
+        serialize: flag to serial to str
+
+    Returns:
+        JWK str or dict
+    """
     if isinstance(key, DSA.DsaKey): raise ValueError('DSA not supported for COSE Key')
     _params = {'kid': key_id}
     return json.dumps(_to_params(_params, key, alg)) if serialize else _params
 
 
 def load_jwk(data: str) -> tuple[OrchisKey, str]:
+    """
+    Loads an OrchisKey instance and Key ID from JWK str.
+
+    Args:
+        data: JWK str
+
+    Returns:
+        OrchisKey instance, Key ID str
+    """
     _jwk = json.loads(data)
     if not isinstance(_jwk, dict): raise TypeError('improper JWK format')
     return _from_params(_jwk), _jwk.get('kid', '')
 
 
-def dump_cose_key(key: OrchisKey, key_id: bytes, alg: OrchisRsaAlgorithms, serialize: bool = False) -> bytes | dict[int, Any]:
+def dump_cose_key(
+        key: OrchisKey,
+        key_id: bytes,
+        alg: OrchisAlgorithm,
+        serialize: bool = False
+) -> bytes | dict[int, Any]:
+    """
+    Dumps an OrchisKey as CBOR COSE Key bytes or dict.
+
+    Args:
+        key: OrchisKey instance
+        key_id: Key ID to use, typically IPv6Address packed
+        alg: OrchisAlgorithms instance
+        serialize: flag to serial to bytes
+
+    Returns:
+        COSE Key bytes or dict
+    """
     if isinstance(key, DSA.DsaKey): raise ValueError('DSA not supported for COSE Key')
     _params: dict[int, Any] = {2: key_id}
     return cbor2.dumps(_to_params(_params, key, alg)) if serialize else _params
 
 
 def load_cose_key(data: bytes) -> tuple[OrchisKey, bytes]:
+    """
+    Loads an OrchisKey instance and Key ID from COSE Key bytes.
+
+    Args:
+        data: CBOR encoded bytes
+
+    Returns:
+        OrchisKey instance, Key ID bytes
+    """
     _key = cbor2.loads(data)
     if not isinstance(_key, dict): raise TypeError('improper COSE Key format')
     return _from_params(_key), _key.get(2, bytes())
@@ -128,6 +214,9 @@ def construct_host_identity(key: OrchisKey) -> bytes:
     """
     Host Identity field of HOST_ID parameter from RFC7401.
 
+    For RSA/DSA this is specified by RFC4034 (DNSKEY).
+    For ECC this is a curve enumeration + Section 6 of RFC6090
+
     Args:
         key: key instance to be used.
 
@@ -150,7 +239,8 @@ def construct_host_identity(key: OrchisKey) -> bytes:
         case SuiteId.EDDSA_CSHAKE128:
             public: ECC.EccKey
             _curve = (1 if public.curve == 'Ed25519' else 3).to_bytes(2)
-            return _curve + public.export_key(format='raw')
+            # RFC9374 specifies a slight different layout to ECDSA
+            return _curve + bytes([0, 0]) + public.export_key(format='raw')
         case _:
             raise TypeError('key algorithm not supported')
 
@@ -162,17 +252,17 @@ def load_key_id(
         info: bytes | None = None
 ) -> IPv6Address:
     """
-    Attempts to load a COSE/JOSE Key ID into an IPv6 address. Otherwise uses public key
-    and parameters to create new Key ID based on ORCHID.
+    Attempts to load a COSE/JOSE Key ID into an IPv6 address. Otherwise, uses public key
+    and parameters to create new Key ID with ORCHID.
 
     Args:
         kid: existing Key ID from COSE/JOSE
-        public: instance of OrchisPublicKeyAlgorithms to use to create new Key ID
-        prefix: optional Prefix to use if JWK does not have an ORCHID Key ID, default=Prefix.HIT
-        info: optional additional info to use if JWK does not have an ORCHID Key ID, default=None
+        public: instance of OrchisKey to use to create new Key ID
+        prefix: optional Prefix to use if no Key ID, default=Prefix.HIT
+        info: optional additional info to use if no Key ID, default=None
 
     Returns:
-        An IPv6 Address instance with ORCHID
+        An IPv6 Address instance with ORCHID to be used as a Key ID
     """
     try:
         return IPv6Address(kid)
@@ -192,7 +282,7 @@ def construct_ip(
         ctx_id: ContextId = ContextId.RFC7401
 ) -> IPv6Address:
     """
-    Constructs an ORCHID per RFC7401 and RFC9374.
+    Constructs an ORCHID per RFC7401 or RFC9374.
 
     Args:
         public: public key instance to be used
@@ -248,7 +338,7 @@ def _construct_prefix_info_oga(prefix: Prefix, oga_id: SuiteId, info: bytes | No
 def _to_params(
         params: dict[int, Any] | dict[str, Any],
         key: OrchisKey,
-        alg: OrchisRsaAlgorithms = 'PS256'
+        alg: OrchisAlgorithm = 'PS256'
 ) -> dict[str, Any] | dict[int, Any]:
     if key is None: raise ValueError('no key specified')
     is_jwk = all(isinstance(k, str) for k, _ in params.items())
@@ -265,21 +355,21 @@ def _rsa_to_params(
         key: RSA.RsaKey,
         params: dict,
         is_jwk: bool,
-        alg: OrchisRsaAlgorithms = 'PS256'
+        alg: OrchisAlgorithm = 'PS256'
 ) -> dict[str, Any] | dict[int, Any]:
-    params.update({'kty' if is_jwk else 1 : 'RSA' if is_jwk else 3})
+    params.update({'kty' if is_jwk else 1: 'RSA' if is_jwk else 3})
     params.update({
         'n' if is_jwk else -1: _int_to_bytes(key.n, True) if is_jwk else _int_to_bytes(key.n),
         'e' if is_jwk else -2: _int_to_bytes(key.e, True) if is_jwk else _int_to_bytes(key.e),
     })
     if key.has_private():
         params.update({
-            'd' if is_jwk else -3 : _int_to_bytes(key.d, True) if is_jwk else _int_to_bytes(key.d),
-            'p' if is_jwk else -4 : _int_to_bytes(key.p, True) if is_jwk else _int_to_bytes(key.p),
-            'q' if is_jwk else -5 : _int_to_bytes(key.q, True) if is_jwk else _int_to_bytes(key.q),
-            'dp' if is_jwk else -6 : _int_to_bytes(key.invp, True) if is_jwk else _int_to_bytes(key.invp),
-            'dq' if is_jwk else -7 : _int_to_bytes(key.invq, True) if is_jwk else _int_to_bytes(key.invq),
-            'qi' if is_jwk else -8 : _int_to_bytes(key.u, True) if is_jwk else _int_to_bytes(key.u)
+            'd' if is_jwk else -3: _int_to_bytes(key.d, True) if is_jwk else _int_to_bytes(key.d),
+            'p' if is_jwk else -4: _int_to_bytes(key.p, True) if is_jwk else _int_to_bytes(key.p),
+            'q' if is_jwk else -5: _int_to_bytes(key.q, True) if is_jwk else _int_to_bytes(key.q),
+            'dp' if is_jwk else -6: _int_to_bytes(key.invp, True) if is_jwk else _int_to_bytes(key.invp),
+            'dq' if is_jwk else -7: _int_to_bytes(key.invq, True) if is_jwk else _int_to_bytes(key.invq),
+            'qi' if is_jwk else -8: _int_to_bytes(key.u, True) if is_jwk else _int_to_bytes(key.u)
         })
     if is_jwk:
         params.update({'alg': alg})
@@ -298,7 +388,7 @@ def _ecc_to_params(
         is_jwk: bool
 ) -> dict[str, Any] | dict[int, Any]:
     if key.curve in ('NIST P-256', 'NIST P-384'):
-        params.update({'kty' if is_jwk else 1 : 'EC' if is_jwk else 2})
+        params.update({'kty' if is_jwk else 1: 'EC' if is_jwk else 2})
         _crv = ('P-256' if is_jwk else 1) if key.curve == 'NIST P-256' else ('P-384' if is_jwk else 2)
         params.update({'crv' if is_jwk else -1: _crv})
         _size = key.pointQ.size_in_bits()
@@ -307,29 +397,30 @@ def _ecc_to_params(
         _y = _int_to_bytes(_y, True, _size) if is_jwk else _int_to_bytes(_y, bit_size=_size)
         if key.has_private():
             _d = int(key.d)
+            _d = _int_to_bytes(_d, True, _size) if is_jwk else _int_to_bytes(_d, bit_size=_size)
             params.update({
-                'x' if is_jwk else -2 : _x,
-                'y' if is_jwk else -3 : _y,
-                'd' if is_jwk else -4 : _int_to_bytes(_d, True, _size) if is_jwk else _int_to_bytes(_d, bit_size=_size),
+                'x' if is_jwk else -2: _x,
+                'y' if is_jwk else -3: _y,
+                'd' if is_jwk else -4: _d,
             })
         else:
             params.update({
-                'x' if is_jwk else -2 : _x,
-                'y' if is_jwk else -3 : _y,
+                'x' if is_jwk else -2: _x,
+                'y' if is_jwk else -3: _y,
             })
     elif key.curve in ('Ed25519', 'Ed448'):
-        params.update({'kty' if is_jwk else 1 : 'OKP' if is_jwk else 1})
+        params.update({'kty' if is_jwk else 1: 'OKP' if is_jwk else 1})
         _crv = ('Ed25519' if is_jwk else 6) if key.curve == 'Ed25519' else ('Ed448' if is_jwk else 7)
-        params.update({'crv' if is_jwk else -1 : _crv})
+        params.update({'crv' if is_jwk else -1: _crv})
         _public = key.public_key().export_key(format='raw')
         if key.has_private():
             params.update({
-                'x' if is_jwk else -2 : urlsafe_b64encode(_public).decode('utf-8') if is_jwk else _public,
-                'd' if is_jwk else -3 : urlsafe_b64encode(key.seed).decode('utf-8') if is_jwk else key.seed,
+                'x' if is_jwk else -2: urlsafe_b64encode(_public).decode('utf-8') if is_jwk else _public,
+                'd' if is_jwk else -3: urlsafe_b64encode(key.seed).decode('utf-8') if is_jwk else key.seed,
             })
         else:
             params.update({
-                'x' if is_jwk else -2 : urlsafe_b64encode(_public).decode('utf-8') if is_jwk else _public,
+                'x' if is_jwk else -2: urlsafe_b64encode(_public).decode('utf-8') if is_jwk else _public,
             })
     else:
         raise TypeError('ecc curve not supported')
@@ -340,9 +431,12 @@ def _from_params(params: dict[int, Any] | dict[str, Any]) -> OrchisKey:
     is_jwk = all(isinstance(k, str) for k, _ in params.items())
     params: dict[str | int, Any]
     _kty = params['kty' if is_jwk else 1]
-    if _kty == 'RSA' or _kty == 3: return _rsa_from_params(params, is_jwk)
-    elif _kty == 'EC' or _kty == 2: return _ecc_from_params(params, is_jwk)
-    elif _kty == 'OKP' or _kty == 1: return _ecc_from_params(params, is_jwk)
+    if _kty == 'RSA' or _kty == 3:
+        return _rsa_from_params(params, is_jwk)
+    elif _kty == 'EC' or _kty == 2:
+        return _ecc_from_params(params, is_jwk)
+    elif _kty == 'OKP' or _kty == 1:
+        return _ecc_from_params(params, is_jwk)
     else:
         raise TypeError('key algorithm not supported')
 
@@ -350,7 +444,7 @@ def _from_params(params: dict[int, Any] | dict[str, Any]) -> OrchisKey:
 def _rsa_from_params(params: dict, is_jwk: bool) -> OrchisKey:
     _n = int(hexlify(_base64url_decode(params['n'])), 16) if is_jwk else int.from_bytes(params[-1])
     _e = int(hexlify(_base64url_decode(params['e'])), 16) if is_jwk else int.from_bytes(params[-2])
-    if  ('d' not in params) or (-3 not in params):
+    if ('d' not in params) or (-3 not in params):
         key = RSA.construct((_n, _e))
     else:
         _d = int(hexlify(_base64url_decode(params['d'])), 16) if is_jwk else int.from_bytes(params[-3])

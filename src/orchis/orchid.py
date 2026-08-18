@@ -1,10 +1,10 @@
 from ipaddress import IPv6Address
 from typing import Self, Any
 
-from orchis.crypto import dump_cose_key, dump_jwk, dump_key, OrchisFormats, construct_ip, OrchisKeyCurve, OrchisKeySize, \
-    generate, OrchisAlgorithm, load_cose_key, load_key_id, load_jwk, load_key
+from orchis.crypto import dump_cose_key, dump_jwk, dump_key, OrchisFormat, construct_ip, OrchisKeyCurve, \
+    OrchisKeySize, generate, OrchisKeyAlgorithm, load_cose_key, load_key_id, load_jwk, load_key
 from src.orchis.constant import SuiteId, ContextId, Prefix
-from src.orchis.crypto import OrchisKey, construct_host_identity, suite_id_from_public_key_alg, OrchisRsaAlgorithms
+from src.orchis.crypto import OrchisKey, construct_host_identity, suite_id_from_public_key_alg, OrchisAlgorithm
 
 
 class Orchid:
@@ -38,17 +38,17 @@ class Orchid:
     def host_identity(self) -> bytes:
         """
         Returns:
-            Bytes of Host Identity field of the RFC7401 HOST_ID parameter
+            Host Identity field of the RFC7401 HOST_ID parameter
         """
         return construct_host_identity(self.public_key)
 
     @property
-    def domain_identifier(self) -> str:
+    def arpa(self) -> str:
         """
         Returns:
-            IPv6 reverse pointer of type str FQDN when a DET, otherwise ''
+            str IPv6 reverse pointer
         """
-        return self.ip.reverse_pointer if Prefix.from_ip(self.ip) == Prefix.DET else ''
+        return self.ip.reverse_pointer
 
     @property
     def suite_id(self) -> SuiteId:
@@ -57,11 +57,11 @@ class Orchid:
     def cose_key(
             self,
             private_key: bool = False,
-            rsa_alg: OrchisRsaAlgorithms = 'PS256',
+            rsa_alg: OrchisAlgorithm = 'PS256',
             serialize: bool = False
     ) -> bytes | dict[int, Any]:
         """
-        Generates a COSE Key for use with COSE applications, specifically the cwt package.
+        Generates a COSE Key for use with COSE applications.
 
         Args:
             private_key: flag to include private key, default=False
@@ -69,11 +69,11 @@ class Orchid:
             serialize: bool, default=True
 
         Returns:
-            bytes
+            CBOR encoded COSE Key or COSE Key dict
         """
         return dump_cose_key(
             self.key if private_key else self.public_key,
-            bytes.fromhex('D83650') + self.ip.packed, # set Key ID to Tag 54 w/IP6 = 0xD83650
+            bytes.fromhex('D83650') + self.ip.packed,  # set Key ID to Tag 54 w/IP6 = 0xD83650
             rsa_alg,
             serialize
         )
@@ -81,11 +81,11 @@ class Orchid:
     def jwk(
             self,
             private_key: bool = False,
-            rsa_alg: OrchisRsaAlgorithms = 'PS256',
+            rsa_alg: OrchisAlgorithm = 'PS256',
             serialize: bool = False
     ) -> str | dict[str, Any]:
         """
-        Generates a JSON Web Key for use with JOSE applications, specifically the jwcrypto package.
+        Generates a JSON Web Key for use with JOSE applications.
 
         Args:
             private_key: flag to include private key, default=False
@@ -93,7 +93,7 @@ class Orchid:
             serialize: bool, default=True
 
         Returns:
-            str
+            str encoded JWK or JWK dict
         """
         return dump_jwk(
             self.key if private_key else self.public_key,
@@ -105,15 +105,16 @@ class Orchid:
     def dump(
             self,
             private_key: bool = False,
-            fmt: OrchisFormats = 'PEM',
+            fmt: OrchisFormat = 'PEM',
             password: bytes | None = None
     ) -> bytes | str:
         """
         Exports Orchid instance as PEM data.
 
         Args:
-            fmt:
-            password: optional password in bytes for encryption
+            private_key: flag to include private key, default=False
+            fmt: instance OrchisFormats to encode to, default='PEM'
+            password: password in bytes for encryption, default=None
 
         Returns:
             PEM data as bytes
@@ -139,7 +140,7 @@ class Orchid:
     @classmethod
     def host_identity_tag(
             cls,
-            alg: OrchisAlgorithm,
+            alg: OrchisKeyAlgorithm,
             dsa: OrchisKeySize = 2048,
             rsa: OrchisKeySize = 2048,
             curve: OrchisKeyCurve = 'Ed25519'
@@ -148,8 +149,10 @@ class Orchid:
         Generates a Host Identity Tag (HIT) per RFC7401.
 
         Args:
-            hit_suite_id: selection of [HIT] Suite ID
-
+            alg: instance of OrchisAlgorithm
+            dsa: OrchisKeySize, DSA key size in bits, default=2048
+            rsa: OrchisKeySize, RSA key size in bits, default=2048
+            curve: instance of OrchisKeyCurve, default Ed25519
 
         Returns:
             Instance of Orchid with HIT
@@ -159,12 +162,13 @@ class Orchid:
         _orchid.ip = construct_ip(_orchid.key.public_key(), Prefix.HIT)
         return _orchid
 
+
     @classmethod
     def drip_entity_tag(
             cls,
             raa: int,
             hda: int,
-            alg: OrchisAlgorithm,
+            alg: OrchisKeyAlgorithm,
             dsa: OrchisKeySize = 2048,
             rsa: OrchisKeySize = 2048,
             curve: OrchisKeyCurve = 'Ed25519'
@@ -175,6 +179,10 @@ class Orchid:
         Args:
             raa: value for Registered Assigning Authority of HID
             hda: value for HHIT Domain Authority if HID
+            alg: instance of OrchisAlgorithm
+            dsa: OrchisKeySize, DSA key size in bits, default=2048
+            rsa: OrchisKeySize, RSA key size in bits, default=2048
+            curve: instance of OrchisKeyCurve, default Ed25519
 
         Returns:
             Instance of Orchid with DET
@@ -200,7 +208,7 @@ class Orchid:
         Loads a COSE Key into an Orchid instance.
 
         Args:
-            cose_key:
+            cose_key: CBOR encoded COSE Key
             prefix: optional Prefix to use if JWK does not have an ORCHID Key ID, default=Prefix.HIT
             info: optional additional info to use if JWK does not have an ORCHID Key ID, default=None
 
@@ -220,11 +228,10 @@ class Orchid:
             info: bytes | None = None
     ) -> Self:
         """
-        Loads an instance Orchid from a JSON Web Key. This function exports the JWK to PEM then
-        calls import_pem to reload into the Orchid instance.
+        Loads an instance Orchid from a JSON Web Key.
 
         Args:
-            jwk: JSON Web Key as str
+            jwk: str encoded JSON Web Key
             prefix: optional Prefix to use if JWK does not have an ORCHID Key ID, default=Prefix.HIT
             info: optional additional info to use if JWK does not have an ORCHID Key ID, default=None
 
@@ -241,26 +248,24 @@ class Orchid:
             cls,
             pem_data: bytes,
             password: bytes | None = None,
-            kid: str = '',
             prefix: Prefix = Prefix.HIT,
             info: bytes | None = None,
     ) -> Self:
         """
-        Loads a PEM file and instantiates a Orchid instance using data.
+        Loads a PEM file and instantiates an Orchid instance using data.
 
         Args:
             pem_data: bytes of PEM data
             password: optional PEM decryption password, default=None
-            kid: optional ORCHID Key ID from COSE Key or JWK, default=''
-            prefix: optional Prefix to use if JWK does not have an ORCHID Key ID, default=Prefix.HIT
-            info: optional additional info to use if JWK does not have an ORCHID Key ID, default=None
+            prefix: optional Prefix to use if no Key ID, default=Prefix.HIT
+            info: optional additional info to use if no Key ID, default=None
 
         Returns:
             Instance of Orchid loaded through PEM data
         """
         _orchid = cls()
         _orchid.key = load_key(pem_data, password)
-        _orchid.ip = load_key_id(kid, _orchid.key.public_key(), prefix, info)
+        _orchid.ip = load_key_id(None, _orchid.key.public_key(), prefix, info)
         return _orchid
 
     def __str__(self) -> str:

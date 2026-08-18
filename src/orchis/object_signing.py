@@ -7,7 +7,7 @@ from cwt.cose_key_interface import COSEKeyInterface
 from jwcrypto.jwk import JWK
 from jwcrypto.jws import JWS
 
-from orchis.crypto import OrchisRsaAlgorithms
+from orchis.crypto import OrchisAlgorithm
 from orchis.orchid import Orchid
 
 
@@ -20,6 +20,7 @@ class ObjectSigning:
 
     WARNING: this class and its functions have not been tested. Beware of dragons!
     """
+
     def __init__(self):
         self._signers: dict[IPv6Address, Orchid] = {}
 
@@ -85,7 +86,7 @@ class ObjectSigning:
             self,
             ip6: IPv6Address,
             jwk: bool = False,
-            alg: OrchisRsaAlgorithms = 'PS256'
+            alg: OrchisAlgorithm = 'PS256'
     ) -> JWK | COSEKeyInterface:
         """
         Provides an Orchid instance from the internal store as COSE Key or JWK.
@@ -106,7 +107,7 @@ class ObjectSigning:
     def sign(
             self,
             payload: bytes,
-            signers: dict[str | bytes | IPv6Address, OrchisRsaAlgorithms],
+            signers: dict[str | bytes | IPv6Address, OrchisAlgorithm],
             jws: bool = False
     ) -> JWS | COSEMessage:
         """
@@ -137,7 +138,7 @@ class ObjectSigning:
     def countersign(
             self,
             msg: COSEMessage,
-            signers: dict[str | bytes | IPv6Address, OrchisRsaAlgorithms]
+            signers: dict[str | bytes | IPv6Address, OrchisAlgorithm]
     ) -> COSEMessage:
         """
 
@@ -155,7 +156,7 @@ class ObjectSigning:
     def verify(
             self,
             token: str | bytes,
-            keys: dict[str | bytes | IPv6Address, OrchisRsaAlgorithms]
+            keys: dict[str | bytes | IPv6Address, OrchisAlgorithm]
     ) -> tuple[bool, JWS | COSEMessage | None]:
         """
         WARNING: not tested, probably very very very very wrong and broken.
@@ -183,7 +184,7 @@ class ObjectSigning:
 
     def _prepare_signers(
             self,
-            signers: dict[str | bytes | IPv6Address, OrchisRsaAlgorithms],
+            signers: dict[str | bytes | IPv6Address, OrchisAlgorithm],
             jwk: bool = False
     ) -> list[JWK] | list[COSEKeyInterface]:
         """
@@ -211,7 +212,7 @@ class ObjectSigning:
                 _kid = _ip6
             if _kid not in self._signers: continue
             if not self._signers[_kid].has_private: continue
-            if _alg not in get_args(OrchisRsaAlgorithms): continue
-            _alg: OrchisRsaAlgorithms
+            if _alg not in get_args(OrchisAlgorithm): continue
+            _alg: OrchisAlgorithm
             _signers.append(self.get_signer(_kid, jwk, _alg))
         return _signers
