@@ -33,8 +33,8 @@ general toolbox for using of ORCHIDs.
 
 ```bash
 pip3 install pyorchis # core ORCHID capabilities
-pip3 install pyorchis[drip] # additional capabilities for DRIP
-pip3 install pyorchis[all] # all modules
+pip3 install pyorchis[drip] # capabilities for DRIP
+pip3 install pyorchis[all] # all capabilities
 ```
 
 ## Cryptography Matrix
@@ -80,7 +80,8 @@ attribute. A raw key import generates the ORCHID directly from incoming key mate
 
 `Orchid.host_identity()` provides the "Host Identity" field for 
 the [HOST_ID](https://datatracker.ietf.org/doc/html/rfc7401#section-5.2.9) parameter. This is used as part of the 
-Base Exchange (BEX) when initiating a HIP connection.
+Base Exchange (BEX) when initiating a HIP connection. This structure is also used in the generation of an ORCHID as 
+the primary data input for the hash algorithm.
 
 ## DRIP Capabilities
 
