@@ -12,7 +12,7 @@ dependencies = [
     "pycryptodome>3.23.0",
 ]
 authors = [
-    { name = "Adam Wiethuechter", email = "adam.wiethuechter@gmail.com" }
+    { name = "Adam Wiethuechter", email = "atw.ietf@gmail.com" }
 ]
 readme = "README.md"
 license = "GPL-3.0-or-later"
