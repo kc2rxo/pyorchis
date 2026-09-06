@@ -22,13 +22,20 @@ class Prefix(Enum):
 
 
 class SuiteId(IntEnum):
-    # 1-31 are for HIT/HHIT dual use, 32-255 is for HHIT only use
     RESERVED = 0
-    RSA_DSA_SHA256 = 1  # only RSA is supported, no DSA
+
+    # 1-15 are Basic HIT Suite IDs (formery ther upper nibble of HIT Suite ID of RFC7401)
+    RSA_DSA_SHA256 = 1
     ECDSA_SHA384 = 2
-    # ECDSA_LOW_SHA1 = 3  # not supported due to missing key algorithm in pyca
+    # ECDSA_LOW_SHA1 = 3  # not supported due to missing curve
     # Unassigned 4
     EDDSA_CSHAKE128 = 5
-    # Unassigned 6-253
+
+    # 16 is original flag for HIT Suite ID to be Extended into lower nibble
+    # 17-31 are Extended HIT Suite IDs (formerly the lower nibble of HIT Suite ID of RFC7401)
+    # Unassigned 17-31
+
+    # 32+ are HHIT Suite IDs defined by RFC9374
+    # Unassigned 32-253
     PRIVATE_USE_1 = 254
     PRIVATE_USE_2 = 255
