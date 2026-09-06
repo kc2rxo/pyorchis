@@ -67,7 +67,7 @@ Both RFC7401 prefix of `2001:20::/28` and RFC9374 prefix of `2001:30::/28` are s
 | EdDSA         | Ed25519    | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 | ECDSA         | Ed448      | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 
-[JSON Web Keys of RFC7517](https://datatracker.ietf.org/doc/html/rfc7517)) and 
+[JSON Web Keys of RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) and 
 [COSE Keys of RFC9052](https://datatracker.ietf.org/doc/html/rfc9052#section-7) are imported using their native 
 encoded typing (`str`/`bytes`) and can be exported either encoded or in `dict[int, Any]` for COSE Key and `dict[str,
  Any]` for JWK.
