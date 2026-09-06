@@ -238,7 +238,7 @@ def construct_host_identity(key: OrchisKey) -> bytes:
                 public: DSA.DsaKey
                 _p_len = (public.p.bit_length() + 7) // 8
                 if _p_len < 64:
-                    _param_len = 60
+                    _param_len = 64
                     _t_val = 0
                 else:
                     _t_val = (_p_len - 64 + 7) // 8
