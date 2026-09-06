@@ -288,7 +288,6 @@ def load_key_id(
             public,
             prefix,
             info,
-            ContextId.RFC7401 if prefix is Prefix.HIT else ContextId.RFC9374
         )
 
 
@@ -296,7 +295,6 @@ def construct_ip6(
         public: OrchisKey,
         prefix: Prefix,
         info: bytes | None = None,
-        ctx_id: ContextId = ContextId.RFC7401
 ) -> IPv6Address:
     """
     Constructs an ORCHID per RFC7401 or RFC9374.
@@ -305,33 +303,26 @@ def construct_ip6(
         public: public key instance to be used
         prefix: Prefix instance to be used
         info: optional bytes of additional information (per RFC9374), default=None
-        ctx_id: ContextId instance to be used, default=ContextId.RFC7401
 
     Returns:
         An instance of IPv6Address containing constructed ORCHID
     """
     _suite_id = suite_id_from_key(public)
-    _prefix_info_oga = _construct_ip6_network(prefix, SuiteId.RSA_DSA_SHA256, info)
-    _hih_length = 16 - len(_prefix_info_oga)
+    _ip_network = _construct_ip6_network(prefix, _suite_id, info)
+    _hih_length = 16 - len(_ip_network)
+    _hi = construct_host_identity(public)
+    _input = _hi if prefix is Prefix.HIT else _ip_network + _hi
+    _ctx_id = ContextId.RFC7401.value if prefix is Prefix.HIT else ContextId.RFC9374.value
     match _suite_id:
         case SuiteId.RSA_DSA_SHA256:
-            _hih = _extract_bits(
-                SHA256.new(ctx_id.value + _prefix_info_oga + construct_host_identity(public)).digest(),
-                _hih_length * 8
-            )
+            _hih = _extract_bits(SHA256.new(_ctx_id + _input).digest(), _hih_length * 8)
         case SuiteId.ECDSA_SHA384:
-            _hih = _extract_bits(
-                SHA384.new(ctx_id.value + _prefix_info_oga + construct_host_identity(public)).digest(),
-                _hih_length * 8
-            )
+            _hih = _extract_bits(SHA384.new(_ctx_id + _input).digest(), _hih_length * 8)
         case SuiteId.EDDSA_CSHAKE128:
-            _hih = cSHAKE128.new(
-                _prefix_info_oga + construct_host_identity(public),
-                custom=ctx_id.value
-            ).read(_hih_length)
+            _hih = cSHAKE128.new(_input, custom=_ctx_id).read(_hih_length)
         case _:
             raise TypeError('key algorithm not supported')
-    return IPv6Address(_prefix_info_oga + _hih)
+    return IPv6Address(_ip_network + _hih)
 
 
 def _construct_ip6_network(prefix: Prefix, oga_id: SuiteId, info: bytes | None = None) -> bytes:

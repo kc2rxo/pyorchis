@@ -3,7 +3,7 @@ from typing import Self, Any
 
 from orchis.crypto import dump_cose_key, dump_jwk, dump_key, OrchisFormat, construct_ip6, OrchisKeyCurve, \
     OrchisKeySize, generate, OrchisKeyAlgorithm, load_cose_key, load_key_id, load_jwk, load_key
-from src.orchis.constant import SuiteId, ContextId, Prefix
+from src.orchis.constant import SuiteId, Prefix
 from src.orchis.crypto import OrchisKey, construct_host_identity, suite_id_from_key, OrchisAlgorithm
 
 
@@ -134,7 +134,6 @@ class Orchid:
             self.key.public_key(),
             _prefix,
             _info,
-            ContextId.RFC7401 if _prefix is Prefix.HIT else ContextId.RFC9374
         )
 
     @classmethod
@@ -193,7 +192,6 @@ class Orchid:
             _orchid.key.public_key(),
             Prefix.DET,
             (raa << 14 | hda).to_bytes(4),
-            ContextId.RFC9374
         )
         return _orchid
 
