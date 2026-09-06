@@ -226,12 +226,29 @@ def construct_host_identity(key: OrchisKey) -> bytes:
     public = key.public_key() if key.has_private() else key
     match suite_id_from_key(public):
         case SuiteId.RSA_DSA_SHA256:
-            public: RSA.RsaKey
-            _e_size = (public.e.bit_length() + 7) // 8
-            _e_len = _e_size.to_bytes(3 if _e_size > 255 else 1)
-            _e = public.e.to_bytes(_e_size)
-            _n = public.n.to_bytes((public.n.bit_length() + 7) // 8)
-            return _e_len + _e + _n
+            if isinstance(public, RSA.RsaKey):
+                # RFC3110, Section 2
+                _e_size = (public.e.bit_length() + 7) // 8
+                _e_len = _e_size.to_bytes(3 if _e_size > 255 else 1)
+                _e = public.e.to_bytes(_e_size)
+                _n = public.n.to_bytes((public.n.bit_length() + 7) // 8)
+                return _e_len + _e + _n
+            else:
+                # RFC2536, Section 2
+                public: DSA.DsaKey
+                _p_len = (public.p.bit_length() + 7) // 8
+                if _p_len < 64:
+                    _param_len = 60
+                    _t_val = 0
+                else:
+                    _t_val = (_p_len - 64 + 7) // 8
+                    _param_len = 64 + (8 * _t_val)
+                _t = bytes([_t_val])
+                _q = public.q.to_bytes(20)
+                _p = public.p.to_bytes(_param_len)
+                _g = public.g.to_bytes(_param_len)
+                _y = public.y.to_bytes(_param_len)
+                return _t + _q + _p + _g + _y
         case SuiteId.ECDSA_SHA384:
             public: ECC.EccKey
             _curve = (1 if public.curve == 'P-256' else 2).to_bytes(2)
