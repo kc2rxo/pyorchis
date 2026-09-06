@@ -24,15 +24,15 @@ class Prefix(Enum):
 class SuiteId(IntEnum):
     RESERVED = 0
 
-    # 1-15 are Basic HIT Suite IDs (formery ther upper nibble of HIT Suite ID of RFC7401)
+    # 1-15 are Basic HIT Suite IDs (upper nibble of 8-bit HIT Suite ID of RFC7401)
     RSA_DSA_SHA256 = 1
     ECDSA_SHA384 = 2
     # ECDSA_LOW_SHA1 = 3  # not supported due to missing curve
     # Unassigned 4
     EDDSA_CSHAKE128 = 5
 
-    # 16 is original flag for HIT Suite ID to be Extended into lower nibble
-    # 17-31 are Extended HIT Suite IDs (formerly the lower nibble of HIT Suite ID of RFC7401)
+    # 16 skipped to align with lower nibble of 8-bit HIT Suite ID
+    # 17-31 are Extended HIT Suite IDs (lower nibble of 8-bit HIT Suite ID of RFC7401)
     # Unassigned 17-31
 
     # 32+ are HHIT Suite IDs defined by RFC9374
