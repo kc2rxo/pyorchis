@@ -91,3 +91,43 @@ class HipSuiteId(IntEnum):
     # 0xF1 - 0xFF
     PRIVATE_USE_1 = 254
     PRIVATE_USE_2 = 255
+
+
+class NewHipSuiteId(IntEnum):
+    # draft-atw-orchid-v3, Section 3.1.1, Section 4.4 & Section 5.2
+    RESERVED = 0  # 0x80
+
+    # 0x81 - 0x8F (1 - 15): Extended
+    ECDSA_P256_SHA384 = 2
+    ECDSA_LOW_SECP160R1_SHA1 = 3
+    EDDSA_25519_CSHAKE128 = 5
+    # 0x90/0x1 (16): Basic, 0x91 - 0x9F (17 - 31): Extended
+    RSA_DSA_SHA256 = 16
+    # 0xA0/0x2 (32): Basic, - 0xAF (33 - 47): Extended
+    ECDSA_SHA384 = 32
+    ECDSA_P384_SHA384 = 33
+    # 0xB0/0x3 (48): Basic, 0x0B1 - 0xBF (49 - 63): Extended
+    ECDSA_LOW_SHA1 = 48
+    # 0xC0/0x4 (64): Basic, 0xC1 - 0xCF (65 - 79): Extended
+    # 0xD0/0x5 (80): Basic, 0xD1 - 0xDF (81 - 95): Extended
+    EDDSA_CSHAKE128 = 80
+    EDDSA_25519PH_CSHAKE128 = 81
+    EDDSA_448_CSHAKE256 = 82
+    EDDSA_448PH_CSHAKE256 = 83
+    # 0xE0/0x6 (96): Basic, 0xE1 - 0xEF (97 - 111): Extended
+    # 0xF0/0x7 (112): Basic, 0xF1 - 0xFF (113 - 127): Extended
+    PRIVATE_USE_1 = 126
+    PRIVATE_USE_2 = 127
+
+    def oga_id(self, extended: bool = False) -> bytes:
+        _v = (self | 0x80) if extended else (self & 0b01110000)
+        if not self._is_valid(_v): raise ValueError(f"invalid {'extended' if extended else 'basic'} oga id")
+        return _v.to_bytes(1)
+
+    @classmethod
+    def hit_suite_ids(cls) -> tuple:
+        return cls.RSA_DSA_SHA256, cls.ECDSA_SHA384, cls.ECDSA_LOW_SHA1, None, cls.EDDSA_CSHAKE128, None, None
+
+    @classmethod
+    def _is_valid(cls, value: int) -> bool:
+        return value in cls._value2member_map_
