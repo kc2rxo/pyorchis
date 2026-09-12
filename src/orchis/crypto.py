@@ -5,11 +5,12 @@ from ipaddress import IPv6Address
 from typing import Literal, Any, get_args
 
 import cbor2
-from Crypto.Hash import cSHAKE128, SHA256, SHA384
+from Crypto.Hash import cSHAKE128, SHA256, SHA384, cSHAKE256
 from Crypto.PublicKey import DSA, RSA, ECC
 from Crypto.Signature import eddsa
 
-from src.orchis.constant import ContextId, Prefix, SuiteId
+from orchis.constant import HiAlgorithm
+from src.orchis.constant import ContextId, Prefix, HipSuiteId
 
 OrchisKeyAlgorithm = Literal['DSA', 'RSA', 'ECDSA', 'EdDSA']
 OrchisKey = DSA.DsaKey | RSA.RsaKey | ECC.EccKey
@@ -191,7 +192,7 @@ def load_cose_key(data: bytes) -> tuple[OrchisKey, bytes]:
     return _from_params(_key), _key.get(2, bytes())
 
 
-def suite_id_from_key(key: OrchisKey) -> SuiteId:
+def hi_algorithm_from_key(key: OrchisKey) -> HiAlgorithm:
     """
     Selects a SuiteID from OrchisKey instance
 
@@ -201,16 +202,18 @@ def suite_id_from_key(key: OrchisKey) -> SuiteId:
     Returns:
         SuiteId instance
     """
-    if isinstance(key, DSA.DsaKey) or isinstance(key, RSA.RsaKey):
-        return SuiteId.RSA_DSA_SHA256
+    if isinstance(key, DSA.DsaKey):
+        return HiAlgorithm.DSA
+    elif isinstance(key, RSA.RsaKey):
+        return HiAlgorithm.RSA
     elif isinstance(key, ECC.EccKey) and key.curve in ('NIST P-256', 'NIST P-384'):
-        return SuiteId.ECDSA_SHA384
+        return HiAlgorithm.ECDSA
     elif isinstance(key, ECC.EccKey) and key.curve in ('Ed25519', 'Ed448'):
-        return SuiteId.EDDSA_CSHAKE128
+        return HiAlgorithm.EDDSA
     raise TypeError('Public key algorithm not supported')
 
 
-def construct_host_identity(key: OrchisKey) -> bytes:
+def construct_host_identity(key: OrchisKey) -> tuple[bytes, HiAlgorithm]:
     """
     Host Identity field of HOST_ID parameter from RFC7401.
 
@@ -224,20 +227,26 @@ def construct_host_identity(key: OrchisKey) -> bytes:
         bytes of the Host Identity field of HOST_ID parameter
     """
     public = key.public_key() if key.has_private() else key
-    match suite_id_from_key(public):
-        case SuiteId.RSA_DSA_SHA256:
-            return _rfc3110_key_rrdata(public) if isinstance(public, RSA.RsaKey) else _rfc2536_key_rrdata(public)
-        case SuiteId.ECDSA_SHA384:
+    _hi_alg = hi_algorithm_from_key(public)
+    match _hi_alg:
+        case HiAlgorithm.DSA:
+            public: DSA.DsaKey
+            _hi = _rfc2536_key_rrdata(public)
+        case HiAlgorithm.RSA:
+            public: RSA.RsaKey
+            _hi = _rfc3110_key_rrdata(public)
+        case HiAlgorithm.ECDSA:
             public: ECC.EccKey
             _curve = (1 if public.curve == 'P-256' else 2).to_bytes(2)
-            return _curve + public.export_key(format='raw')
-        case SuiteId.EDDSA_CSHAKE128:
+            _hi = _curve + public.export_key(format='raw')
+        case HiAlgorithm.EDDSA:
             public: ECC.EccKey
             _curve = (1 if public.curve == 'Ed25519' else 3).to_bytes(2)
             # RFC9374 specifies a slight different layout to ECDSA
-            return _curve + bytes([0, 0]) + public.export_key(format='raw')
+            _hi = _curve + bytes([0, 0]) + public.export_key(format='raw')
         case _:
-            raise TypeError('key algorithm not supported')
+            raise TypeError('HI algorithm not supported')
+    return _hi, _hi_alg
 
 
 def load_key_id(
@@ -269,10 +278,29 @@ def load_key_id(
         )
 
 
+def suite_id_from_key(key: OrchisKey, hi_alg: HiAlgorithm | None = None, prefix: Prefix = Prefix.HIT) -> HipSuiteId:
+    _hi_alg = hi_alg if hi_alg else hi_algorithm_from_key(key)
+    match _hi_alg:
+        case HiAlgorithm.DSA | HiAlgorithm.RSA:
+            return HipSuiteId.RSA_DSA_SHA256
+        case HiAlgorithm.ECDSA:
+            key: ECC.EccKey
+            if prefix is Prefix.DET and key.curve == 'NIST P-256': return HipSuiteId.ECDSA_P256_SHA384
+            elif prefix is Prefix.DET and key.curve == 'NIST P-384': return HipSuiteId.ECDSA_P384_SHA384
+            return HipSuiteId.ECDSA_SHA384
+        case HiAlgorithm.EDDSA:
+            key: ECC.EccKey
+            if prefix is Prefix.DET and key.curve == 'Ed25519': return HipSuiteId.EDDSA_25519_CSHAKE128
+            elif prefix is Prefix.DET and key.curve == 'Ed448': return HipSuiteId.EDDSA_448_CSHAKE256
+            return HipSuiteId.EDDSA_CSHAKE128
+        case _:
+            raise TypeError('hi algorithm not supported')
+
+
 def construct_ip6(
         public: OrchisKey,
         prefix: Prefix,
-        info: bytes | None = None,
+        info: bytes | None = None
 ) -> IPv6Address:
     """
     Constructs an ORCHID per RFC7401 or RFC9374.
@@ -285,31 +313,33 @@ def construct_ip6(
     Returns:
         An instance of IPv6Address containing constructed ORCHID
     """
-    _suite_id = suite_id_from_key(public)
-    _ip_network = _construct_ip6_network(prefix, _suite_id, info)
-    _hih_length = 16 - len(_ip_network)
-    _hi = construct_host_identity(public)
-    _input = _hi if prefix is Prefix.HIT else _ip_network + _hi
     _ctx_id = ContextId.RFC7401.value if prefix is Prefix.HIT else ContextId.RFC9374.value
-    match _suite_id:
-        case SuiteId.RSA_DSA_SHA256:
+    _hi, _hi_alg = construct_host_identity(public)
+    _suite_id = suite_id_from_key(public, _hi_alg, prefix)
+    _ip_network = _construct_ip6_network(prefix, _suite_id, info)
+    _input = _hi if prefix is Prefix.HIT else _ip_network + _hi
+    _hih_length = 16 - len(_ip_network)
+    match _hi_alg:
+        case HiAlgorithm.DSA | HiAlgorithm.RSA:
             _hih = _extract_bits(SHA256.new(_ctx_id + _input).digest(), _hih_length * 8)
-        case SuiteId.ECDSA_SHA384:
+        case HiAlgorithm.ECDSA:
             _hih = _extract_bits(SHA384.new(_ctx_id + _input).digest(), _hih_length * 8)
-        case SuiteId.EDDSA_CSHAKE128:
-            _hih = cSHAKE128.new(_input, custom=_ctx_id).read(_hih_length)
+        case HiAlgorithm.EDDSA:
+            if _suite_id in (HipSuiteId.EDDSA_448_CSHAKE256, HipSuiteId.EDDSA_448PH_CSHAKE256):
+                _hih = cSHAKE256.new(_input, custom=_ctx_id).read(_hih_length)
+            else:
+                _hih = cSHAKE128.new(_input, custom=_ctx_id).read(_hih_length)
         case _:
-            raise TypeError('key algorithm not supported')
+            raise TypeError('hi algorithm / hash algorithm not supported')
     return IPv6Address(_ip_network + _hih)
 
 
-def _construct_ip6_network(prefix: Prefix, oga_id: SuiteId, info: bytes | None = None) -> bytes:
+def _construct_ip6_network(prefix: Prefix, oga_id: HipSuiteId, info: bytes | None = None) -> bytes:
     # info & oga_id length is determined by the prefix in use
     match prefix:
         case Prefix.HIT:
-            if oga_id > 15: raise ValueError("Non-valid SuiteId for HITs")  # ensures 4-bit oga_id
-            # enum=32-bits w/tail 0, no need to shift just fill in lower 4-bits
-            _prefix = int.from_bytes(prefix.value) | oga_id.value
+            # enum=32-bits w/tail 0, no need to shift just fill in lower 4-bits with upper 4-bits of OGA ID
+            _prefix = int.from_bytes(prefix.value) | (oga_id.value >> 4)
             return _prefix.to_bytes(4)
         case Prefix.DET:
             if not info: raise ValueError('No info provided')

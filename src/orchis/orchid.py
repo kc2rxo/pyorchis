@@ -1,10 +1,11 @@
 from ipaddress import IPv6Address
 from typing import Self, Any
 
+from orchis.constant import HipSuiteId, HiAlgorithm
 from orchis.crypto import dump_cose_key, dump_jwk, dump_key, OrchisFormat, construct_ip6, OrchisKeyCurve, \
-    OrchisKeySize, generate, OrchisKeyAlgorithm, load_cose_key, load_key_id, load_jwk, load_key
-from src.orchis.constant import SuiteId, Prefix
-from src.orchis.crypto import OrchisKey, construct_host_identity, suite_id_from_key, OrchisAlgorithm
+    OrchisKeySize, generate, OrchisKeyAlgorithm, load_cose_key, load_key_id, load_jwk, load_key, suite_id_from_key
+from src.orchis.constant import Prefix
+from src.orchis.crypto import OrchisKey, construct_host_identity, OrchisAlgorithm
 
 
 class Orchid:
@@ -35,12 +36,20 @@ class Orchid:
         return self.key if self.has_private else None
 
     @property
+    def hi_algorithm(self) -> HiAlgorithm:
+        return construct_host_identity(self.public_key)[1]
+
+    @property
     def host_identity(self) -> bytes:
         """
         Returns:
             Host Identity field of the RFC7401 HOST_ID parameter
         """
-        return construct_host_identity(self.public_key)
+        return construct_host_identity(self.public_key)[0]
+
+    @property
+    def suite_id(self) -> HipSuiteId:
+        return suite_id_from_key(self.public_key, prefix=Prefix.from_ip(self.ip))
 
     @property
     def arpa(self) -> str:
@@ -49,10 +58,6 @@ class Orchid:
             str IPv6 reverse pointer
         """
         return self.ip.reverse_pointer
-
-    @property
-    def suite_id(self) -> SuiteId:
-        return suite_id_from_key(self.public_key)
 
     def cose_key(
             self,
@@ -268,6 +273,6 @@ class Orchid:
 
     def __str__(self) -> str:
         return (
-            f"IPv6 (ORCHID): {self.ip.exploded} / {self.ip}"
+            f"IPv6 (ORCHID): {self.ip.exploded} / {self.ip}\n"
             f"Public Key (HI): {self.host_identity.hex()}"
         )
